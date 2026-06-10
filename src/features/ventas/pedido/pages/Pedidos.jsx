@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { Box, Pagination } from "@mui/material";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { usePedidos } from "../hooks/usePedidos";
@@ -39,7 +39,6 @@ export default function Pedidos() {
     obtenerResumenItems,
   } = usePedidos();
 
-  const totalPages = pagination?.total_pages ?? 1;
   const columns = [
     {
       field: "cliente",
@@ -54,7 +53,9 @@ export default function Pedidos() {
     {
       field: "items",
       header: "Items",
-      render: (row) => <span style={{ fontSize: "0.85rem" }}>{obtenerResumenItems(row)}</span>,
+      render: (row) => (
+        <span style={{ fontSize: "0.85rem" }}>{obtenerResumenItems(row)}</span>
+      ),
     },
     {
       field: "total",
@@ -100,7 +101,11 @@ export default function Pedidos() {
               handleAbonar(row);
             }}
             disabled={!puedeAbonar || abonoLoading}
-            title={!puedeAbonar ? "Solo se puede abonar en pedidos pendientes" : "Registrar abono"}
+            title={
+              !puedeAbonar
+                ? "Solo se puede abonar en pedidos pendientes"
+                : "Registrar abono"
+            }
           >
             Abonar
           </button>
@@ -110,9 +115,21 @@ export default function Pedidos() {
   ];
 
   const tableActions = [
-    { label: "Ver Detalles", type: "view", onClick: (row) => navigate(`detalle/${row.id}`) },
-    { label: "Editar", type: "edit", onClick: (row) => navigate(`editar/${row.id}`) },
-    { label: "Eliminar", type: "delete", onClick: (row) => handleDelete(row.id, row.cliente) },
+    {
+      label: "Ver Detalles",
+      type: "view",
+      onClick: (row) => navigate(`detalle/${row.id}`),
+    },
+    {
+      label: "Editar",
+      type: "edit",
+      onClick: (row) => navigate(`editar/${row.id}`),
+    },
+    {
+      label: "Eliminar",
+      type: "delete",
+      onClick: (row) => handleDelete(row.id, row.cliente),
+    },
   ];
 
   return (
@@ -148,19 +165,13 @@ export default function Pedidos() {
           }
         />
 
-        {totalPages > 1 && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3, mb: 2 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-              size="small"
-            />
-          </Box>
-        )}
+        <CrudPagination
+          totalPages={pagination?.total_pages ?? 1}
+          page={page}
+          onChange={setPage}
+        />
 
-        {/* Modal eliminar - message es texto plano, no hay error */}
+        {/* Modal eliminar */}
         <Modal
           open={modalDelete.open}
           type="warning"
@@ -173,7 +184,7 @@ export default function Pedidos() {
           onCancel={closeDeleteModal}
         />
 
-        {/* Modal abono - usando children en lugar de message para evitar <p> anidado */}
+        {/* Modal abono */}
         <Modal
           open={modalAbono.open}
           type="info"
@@ -185,8 +196,12 @@ export default function Pedidos() {
           onCancel={closeAbonoModal}
         >
           <div style={{ marginTop: 8 }}>
-            <p><strong>Cliente:</strong> {modalAbono.cliente}</p>
-            <p><strong>Total del pedido:</strong> {formatCurrency(modalAbono.total)}</p>
+            <p>
+              <strong>Cliente:</strong> {modalAbono.cliente}
+            </p>
+            <p>
+              <strong>Total del pedido:</strong> {formatCurrency(modalAbono.total)}
+            </p>
             <p>
               <strong>Total abonado:</strong>{" "}
               <span style={{ color: "#10b981", fontWeight: 600 }}>
@@ -206,7 +221,14 @@ export default function Pedidos() {
             </p>
             {modalAbono.abonos.length > 0 && (
               <div style={{ marginTop: 12 }}>
-                <p style={{ fontWeight: 600, fontSize: "0.85rem", color: "#6b7280", marginBottom: 4 }}>
+                <p
+                  style={{
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    color: "#6b7280",
+                    marginBottom: 4,
+                  }}
+                >
                   Historial de abonos:
                 </p>
                 <div style={{ maxHeight: 120, overflowY: "auto" }}>
@@ -234,7 +256,10 @@ export default function Pedidos() {
             )}
             {modalAbono.saldoPendiente > 0 ? (
               <div style={{ marginTop: 15 }}>
-                <label htmlFor="montoAbono" style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                <label
+                  htmlFor="montoAbono"
+                  style={{ fontWeight: 600, fontSize: "0.9rem" }}
+                >
                   Nuevo abono:
                 </label>
                 <input
@@ -257,7 +282,14 @@ export default function Pedidos() {
                 />
               </div>
             ) : (
-              <p style={{ marginTop: 12, color: "#10b981", fontWeight: 600, textAlign: "center" }}>
+              <p
+                style={{
+                  marginTop: 12,
+                  color: "#10b981",
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
                 Pedido completamente pagado
               </p>
             )}

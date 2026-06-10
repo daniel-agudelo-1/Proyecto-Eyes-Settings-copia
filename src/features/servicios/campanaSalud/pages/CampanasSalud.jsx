@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CrudLayout from '@shared/components/crud/CrudLayout';
 import CrudTable from '@shared/components/crud/CrudTable';
+import CrudPagination from '@shared/components/crud/CrudPagination';
 import Modal from '@shared/components/ui/Modal';
 import CrudNotification from '@shared/styles/components/notifications/CrudNotification';
 import { useCampanasSalud } from '../hooks/useCampanasSalud';
@@ -10,38 +11,30 @@ export default function CampanasSalud() {
   const navigate = useNavigate();
   const {
     campanas,
+    totalPages,
+    page,
+    setPage,
+    search,
+    setSearch,
+    filterEstado,
+    setFilterEstado,
+    estadoFilterOptions,
     loading,
     notification,
-    estadosCita,
     handleDelete,
     handleCambioEstado,
     hideNotification,
     showNotification,
   } = useCampanasSalud();
 
-  const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState('');
   const [deleteModal, setDeleteModal] = useState({ open: false, id: null, empresa: '' });
 
-  // Opciones de filtro basadas en los estados reales del backend
-  const estadoFilterOptions = [
-    { value: '', label: 'Todos los estados' },
-    ...estadosCita
-      .filter(est => ['Pendiente', 'Completada', 'Cancelada'].includes(est.nombre))
-      .map(est => ({ value: est.id, label: est.nombre })),
-  ];
-
-  const filteredCampanas = campanas.filter((campana) => {
-    const matchesSearch =
-      campana.empresa.toLowerCase().includes(search.toLowerCase()) ||
-      (campana.contacto && campana.contacto !== '-' && campana.contacto.toLowerCase().includes(search.toLowerCase()));
-
-    let matchesFilter = true;
-    if (filterEstado) {
-      matchesFilter = Number(campana.estado_cita_id) === Number(filterEstado);
+  const confirmDelete = async () => {
+    if (deleteModal.id) {
+      await handleDelete(deleteModal.id);
     }
-    return matchesSearch && matchesFilter;
-  });
+    setDeleteModal({ open: false, id: null, empresa: '' });
+  };
 
   const columns = [
     { field: 'empresa', header: 'Empresa' },
@@ -87,11 +80,8 @@ export default function CampanasSalud() {
     },
   ];
 
-  const confirmDelete = async () => {
-    if (deleteModal.id) {
-      await handleDelete(deleteModal.id);
-    }
-    setDeleteModal({ open: false, id: null, empresa: '' });
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
   };
 
   return (
@@ -116,7 +106,7 @@ export default function CampanasSalud() {
       >
         <CrudTable
           columns={columns}
-          data={filteredCampanas}
+          data={campanas}
           actions={tableActions}
           loading={loading}
           onChangeStatus={handleCambioEstado}
@@ -125,6 +115,13 @@ export default function CampanasSalud() {
               ? 'No se encontraron campañas para los filtros aplicados'
               : 'No hay campañas registradas'
           }
+        />
+
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={handlePageChange}
+          show={true}
         />
       </CrudLayout>
 

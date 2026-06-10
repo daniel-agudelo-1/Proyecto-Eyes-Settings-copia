@@ -19,7 +19,6 @@ import {
   authServices,
   validateRegisterForm,
   TIPOS_DOCUMENTO,
-  DOC_PLACEHOLDERS,
   getRegisterInitialData,
   buildRegisterPayload,
   PasswordStrength,
@@ -29,14 +28,15 @@ import {
 export default function Register() {
   const navigate = useNavigate();
 
-  const [formData,              setFormData]              = useState(getRegisterInitialData());
-  const [errors,                setErrors]                = useState({});
-  const [error,                 setError]                 = useState('');
-  const [success,               setSuccess]               = useState(false);
-  const [loading,               setLoading]               = useState(false);
+  const [formData, setFormData] = useState(getRegisterInitialData());
+  const [errors, setErrors] = useState({});
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
-  const [showPassword,          setShowPassword]          = useState(false);
-  const [showConfirmPassword,   setShowConfirmPassword]   = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [debugCode, setDebugCode] = useState(null); // ← solo desarrollo
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -48,6 +48,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setDebugCode(null); // limpiar código anterior
 
     const formErrors = validateRegisterForm(formData);
     if (Object.keys(formErrors).length > 0) {
@@ -58,7 +59,12 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await authServices.sendRegisterCode(buildRegisterPayload(formData));
+      const response = await authServices.sendRegisterCode(buildRegisterPayload(formData));
+      // ========== BLOQUE DE DEPURACIÓN (SOLO DESARROLLO) ==========
+      if (response.debug_code) {
+        setDebugCode(response.debug_code);
+      }
+      // ========== FIN BLOQUE DEPURACIÓN ==========
       setShowVerificationDialog(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Error al enviar el código de verificación');
@@ -90,28 +96,46 @@ export default function Register() {
 
   const handleResendCode = async () => {
     try {
-      await authServices.sendRegisterCode(buildRegisterPayload(formData));
+      const response = await authServices.sendRegisterCode(buildRegisterPayload(formData));
+      // ========== BLOQUE DE DEPURACIÓN (SOLO DESARROLLO) ==========
+      if (response.debug_code) {
+        setDebugCode(response.debug_code);
+      }
+      // ========== FIN BLOQUE DEPURACIÓN ==========
     } catch {
       setError('Error al reenviar el código');
     }
   };
 
+  // ============================================================
+  // Campo "Número" dinámico según tipo de documento
+  // ============================================================
   const renderDocumentoField = () => {
+    const tipo = formData.tipoDocumento;
+    const maxLengthMap = {
+      CC: 10,
+      CE: 12,
+      PASAPORTE: 12,
+      PEP: 15,
+    };
+    const maxLength = maxLengthMap[tipo] || 15;
+
     const commonProps = {
       fullWidth: true,
       size: 'small',
       name: 'numeroDocumento',
+      label: 'Número',
       value: formData.numeroDocumento,
       onChange: handleChange,
-      placeholder: DOC_PLACEHOLDERS[formData.tipoDocumento] || 'Ingrese su número de documento',
+      placeholder: 'Tu número de documento',
       required: true,
       disabled: success || loading,
       error: !!errors.numeroDocumento,
       helperText: errors.numeroDocumento,
-      maxLength: formData.tipoDocumento === 'CC' ? 10 : 15,
+      maxLength: maxLength,
     };
 
-    if (formData.tipoDocumento === 'CC' || formData.tipoDocumento === 'CE') {
+    if (tipo === 'CC' || tipo === 'CE') {
       return <TextFieldNumbers {...commonProps} />;
     }
     return <TextFieldAlphanumeric {...commonProps} />;
@@ -163,7 +187,6 @@ export default function Register() {
 
               <Box component="form" onSubmit={handleSubmit}>
                 <Grid container spacing={2}>
-
                   <Grid item xs={12} sm={6}>
                     <TextFieldLetters
                       fullWidth size="small"
@@ -295,7 +318,12 @@ export default function Register() {
                         ),
                       }}
                     />
-                    <PasswordStrength password={formData.contrasenia} />
+                    <PasswordStrength 
+                    password={formData.contrasenia}
+                    nombre={formData.nombre}
+                    apellido={formData.apellido}
+                    email={formData.correo}
+                    />
                   </Grid>
 
                   <Grid item xs={12} sm={6}>
@@ -324,7 +352,6 @@ export default function Register() {
                       }}
                     />
                   </Grid>
-
                 </Grid>
 
                 <Box sx={{ mt: 2.5, mb: 1, display: 'flex', alignItems: 'flex-start' }}>
@@ -391,6 +418,7 @@ export default function Register() {
           onVerify={handleVerifyCode}
           onResend={handleResendCode}
           loading={loading}
+          debugCode={debugCode}
         />
       </Box>
     </ThemeProvider>

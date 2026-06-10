@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAllCampanasSalud,
@@ -9,16 +9,20 @@ import { getEstadosCita } from '../services/estadosCitaCampanaService';
 import { ESTADOS_BLOQUEADOS, ESTADO_CITA } from '../utils/constants';
 import { formatearFechaLocal, horaA12 } from '../utils/campanasSaludUtils';
 
+const PAGE_SIZE = 10;
+
 /**
  * Hook para la gestión de la lista de campañas de salud.
- * Obtiene campañas y estados de cita mediante React Query,
- * y proporciona mutaciones para eliminar y cambiar estado.
- *
- * @returns {Object} - Campañas, estado de carga, funciones CRUD, notificaciones.
+ * Obtiene todas las campañas y estados de cita mediante React Query,
+ * y proporciona paginación local, filtros y mutaciones.
  */
 export const useCampanasSalud = () => {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [filterEstado, setFilterEstado] = useState(''); // '' o id del estado
   const [notification, setNotification] = useState({ open: false, type: 'success', message: '' });
+  const [deleteModal, setDeleteModal] = useState({ open: false, id: null, empresa: '' });
 
   const showNotification = useCallback(
     (type, message) => setNotification({ open: true, type, message }),
@@ -29,14 +33,26 @@ export const useCampanasSalud = () => {
     []
   );
 
-  // ---------- Consulta de estados de cita ----------
+  // Consulta de estados de cita
   const { data: estadosCita = [] } = useQuery({
     queryKey: ['estados-cita'],
     queryFn: getEstadosCita,
     staleTime: 10 * 60 * 1000,
   });
 
-  // ---------- Transformación de una campaña ----------
+  // Consulta de todas las campañas (sin paginación del backend)
+  const {
+    data: rawCampanas = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['campanas-salud'],
+    queryFn: getAllCampanasSalud,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Transformación de una campaña (para mostrar en tabla)
   const transformCampana = useCallback(
     (campana, estadosActuales) => {
       const hoy = new Date();
@@ -59,7 +75,6 @@ export const useCampanasSalud = () => {
       const estadoObjOriginal = estadosActuales.find((e) => e.id === campana.estado_cita_id);
       const estadoNombre = estadoObj?.nombre || estadoObjOriginal?.nombre || 'Pendiente';
       const bloqueada = ESTADOS_BLOQUEADOS.includes(estadoCitaId);
-      const todosLosEstados = estadosActuales.map((e) => e.nombre);
 
       return {
         id: campana.id,
@@ -77,7 +92,7 @@ export const useCampanasSalud = () => {
         estado_cita_id: estadoCitaId,
         estadoOriginal: campana.estado_cita_id,
         estado: estadoNombre,
-        estadosDisponibles: todosLosEstados,
+        estadosDisponibles: estadosActuales.map((e) => e.nombre),
         esEditable: !bloqueada,
         esEliminable: !bloqueada,
       };
@@ -85,19 +100,13 @@ export const useCampanasSalud = () => {
     []
   );
 
-  // ---------- Consulta de campañas ----------
-  const {
-    data: rawCampanas = [],
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['campanas-salud'],
-    queryFn: getAllCampanasSalud,
-    staleTime: 2 * 60 * 1000,
-  });
+  // Transformar todas las campañas usando los estados actuales
+  const campanasNormalizadas = useMemo(() => {
+    if (!rawCampanas.length || !estadosCita.length) return [];
+    return rawCampanas.map((c) => transformCampana(c, estadosCita));
+  }, [rawCampanas, estadosCita, transformCampana]);
 
-  // Actualización de campañas vencidas en segundo plano
+  // Actualización automática de campañas vencidas en segundo plano
   useEffect(() => {
     if (!rawCampanas.length || !estadosCita.length) return;
 
@@ -127,13 +136,42 @@ export const useCampanasSalud = () => {
     updateVencidas();
   }, [rawCampanas, estadosCita, queryClient]);
 
-  // Transformar campañas usando los estados actuales
-  const campanas = rawCampanas.map((c) => transformCampana(c, estadosCita));
+  // Filtrado local
+  const campanasFiltradas = useMemo(() => {
+    let filtered = campanasNormalizadas;
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          c.empresa.toLowerCase().includes(lowerSearch) ||
+          (c.contacto !== '-' && c.contacto.toLowerCase().includes(lowerSearch))
+      );
+    }
+    if (filterEstado) {
+      const estadoId = parseInt(filterEstado, 10);
+      filtered = filtered.filter((c) => c.estado_cita_id === estadoId);
+    }
+    return filtered;
+  }, [campanasNormalizadas, search, filterEstado]);
 
-  // ---------- Mutaciones ----------
+  // Paginación local
+  const totalItems = campanasFiltradas.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paginatedCampanas = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return campanasFiltradas.slice(start, end);
+  }, [campanasFiltradas, page]);
+
+  // Mutaciones
   const deleteMutation = useMutation({
     mutationFn: deleteCampanaSalud,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campanas-salud'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campanas-salud'] });
+      if (paginatedCampanas.length === 1 && page > 1) {
+        setPage(page - 1);
+      }
+    },
   });
 
   const updateEstadoMutation = useMutation({
@@ -143,7 +181,7 @@ export const useCampanasSalud = () => {
 
   const handleDelete = useCallback(
     async (id) => {
-      const campana = campanas.find((c) => c.id === id);
+      const campana = campanasNormalizadas.find((c) => c.id === id);
       if (campana && ESTADOS_BLOQUEADOS.includes(campana.estado_cita_id)) {
         showNotification(
           'warning',
@@ -161,7 +199,7 @@ export const useCampanasSalud = () => {
         return { success: false, error: msg };
       }
     },
-    [campanas, deleteMutation, showNotification]
+    [campanasNormalizadas, deleteMutation, showNotification]
   );
 
   const handleCambioEstado = useCallback(
@@ -169,7 +207,7 @@ export const useCampanasSalud = () => {
       let targetCampana = campana;
       let estadoNombre = nuevoEstadoNombre;
       if (typeof campana === 'number') {
-        targetCampana = campanas.find((c) => c.id === campana);
+        targetCampana = campanasNormalizadas.find((c) => c.id === campana);
         estadoNombre = nuevoEstadoNombre;
       }
 
@@ -208,19 +246,35 @@ export const useCampanasSalud = () => {
         return { success: false, error: msg };
       }
     },
-    [campanas, estadosCita, updateEstadoMutation, showNotification]
+    [campanasNormalizadas, estadosCita, updateEstadoMutation, showNotification]
   );
 
+  // Opciones de filtro por estado
+  const estadoFilterOptions = [
+    { value: '', label: 'Todos los estados' },
+    ...estadosCita
+      .filter(est => ['Pendiente', 'Completada', 'Cancelada'].includes(est.nombre))
+      .map(est => ({ value: est.id.toString(), label: est.nombre })),
+  ];
+
   return {
-    campanas,
+    campanas: paginatedCampanas,
+    totalPages,
+    page,
+    setPage,
+    search,
+    setSearch,
+    filterEstado,
+    setFilterEstado,
+    estadoFilterOptions,
     loading: isLoading,
     error,
     notification,
     estadosCita,
-    showNotification,
     handleDelete,
     handleCambioEstado,
     hideNotification,
+    showNotification,
     refetch,
   };
 };

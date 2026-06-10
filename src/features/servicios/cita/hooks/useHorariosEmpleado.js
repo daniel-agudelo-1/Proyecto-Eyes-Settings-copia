@@ -15,7 +15,6 @@ export function useHorariosEmpleado(empleadoId) {
     setLoading(true);
     getHorariosByEmpleado(empleadoId)
       .then(data => {
-        console.log("Horarios del empleado", empleadoId, data); // 👈 ver qué llega
         setHorarios(Array.isArray(data) ? data : []);
       })
       .catch(err => setError(err))

@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Box, Button } from "@mui/material";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import UnifiedCrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useNovedades, useNovedadForm, NovedadForm } from "@servicios/novedades";
 import "@shared/styles/components/crud-table.css";
 import "@shared/styles/components/modal.css";
 
-// Colores personalizados (mismo estilo que Horarios)
 const BRAND_COLOR = "#1a2540";
 const BRAND_HOVER = "#2d3a6b";
 
@@ -38,6 +38,9 @@ export default function Novedades() {
     filterEstado,
     setFilterEstado,
     estadoFilters,
+    page,
+    setPage,
+    totalPages,
     eliminarNovedad,
     cambiarEstado,
     crearNovedad,
@@ -84,7 +87,6 @@ export default function Novedades() {
     }
   };
 
-  // Vista → Editar
   const handleEditFromView = () => {
     const viewData = modalForm.initialData;
     closeFormModal();
@@ -138,6 +140,10 @@ export default function Novedades() {
     { label: "Editar", type: "edit", onClick: (item) => openEditModal(item) },
     { label: "Eliminar", type: "delete", onClick: (item) => openDeleteModal(item.id, item.descripcion) },
   ];
+
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+  };
 
   return (
     <>
@@ -200,7 +206,13 @@ export default function Novedades() {
           }
         />
 
-        {/* Modal Eliminar */}
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={handlePageChange}
+          show={true}
+        />
+
         <Modal
           open={modalDelete.open}
           type="warning"
@@ -213,7 +225,6 @@ export default function Novedades() {
           onCancel={closeDeleteModal}
         />
 
-        {/* Modal Formulario */}
         <Modal
           open={modalForm.open}
           type="info"

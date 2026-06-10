@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useProveedores } from "../hooks/useProveedores";
@@ -23,6 +24,9 @@ export default function Proveedores() {
     setSearch,
     filterEstado,
     setFilterEstado,
+    page,
+    setPage,
+    totalPages,
     estadoFilters,
     eliminarProveedor,
     cambiarEstado,
@@ -104,7 +108,7 @@ export default function Proveedores() {
         filterEstado={filterEstado}
         onFilterChange={setFilterEstado}
       >
-        {error && <div className="crud-error">⚠️ {error}</div>}
+        {error && <div className="crud-error">{error}</div>}
 
         <CrudTable
           columns={columns}
@@ -120,10 +124,17 @@ export default function Proveedores() {
           }
         />
 
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={setPage}
+          show={true}
+        />
+
         <Modal
           open={modalDelete.open}
           type="warning"
-          title="¿Eliminar Proveedor?"
+          title="Eliminar Proveedor"
           message={`Esta acción eliminará al proveedor "${modalDelete.razonSocial}" y no se puede deshacer.`}
           confirmText="Eliminar"
           cancelText="Cancelar"

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Pagination } from "@mui/material";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useClientes } from "../hooks/useClientes";
@@ -80,18 +80,11 @@ export default function Clientes() {
           }
         />
 
-        {/* Paginación */}
-        {totalPages > 1 && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3, mb: 2 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-              size="small"
-            />
-          </Box>
-        )}
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={setPage}
+        />
 
         <Modal
           open={modalDelete.open}

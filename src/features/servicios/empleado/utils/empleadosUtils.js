@@ -90,10 +90,29 @@ export const validateNombre = (nombre) => {
 };
 
 // ============================
+// Validación de apellido
+// ============================
+export const validateApellido = (apellido) => {
+  const trimmed = apellido?.trim() || '';
+  
+  if (!trimmed) {
+    return { isValid: false, message: "El apellido es requerido" };
+  }
+  
+  if (trimmed.length < 3) {
+    return { isValid: false, message: "Mínimo 3 caracteres" };
+  }
+  
+  return { isValid: true, message: "" };
+};
+
+// ============================
 // Normalizar empleado (API -> Formulario)
 // ============================
 export const normalizeEmpleadoForForm = (empleado) => ({
+  id: empleado.id,
   nombre: empleado.nombre || "",
+  apellido: empleado.apellido || "",
   tipoDocumento: empleado.tipo_documento || empleado.tipoDocumento || "CC",
   numero_documento: empleado.numero_documento || "",
   telefono: empleado.telefono || "",

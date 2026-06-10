@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import UnifiedCrudTable from "@shared/components/crud/CrudTable";
 import Modal from "@shared/components/ui/Modal";
-import Loading from "@shared/components/ui/Loading";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import { useCitas } from "../hooks/useCitas";
 import "@shared/styles/components/crud-table.css";
 import "@shared/styles/components/modal.css";
@@ -13,7 +13,7 @@ export default function Citas() {
   const navigate = useNavigate();
   const {
     citas,
-    totalCitas,
+    totalPages,
     page,
     setPage,
     perPage,
@@ -68,13 +68,8 @@ export default function Citas() {
     }
   };
 
-  const handlePageChange = (event, newPage) => {
-    setPage(newPage + 1);
-  };
-
-  const handleRowsPerPageChange = (event) => {
-    setPerPage(parseInt(event.target.value, 10));
-    setPage(1);
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
   };
 
   const columns = [
@@ -137,16 +132,18 @@ export default function Citas() {
           actions={tableActions}
           loading={loading}
           onChangeStatus={handleChangeStatus}
-          totalCount={totalCitas}
-          page={page - 1}
-          onPageChange={handlePageChange}
-          rowsPerPage={perPage}
-          onRowsPerPageChange={handleRowsPerPageChange}
           emptyMessage={
             search || filterEstado
               ? "No se encontraron citas para los filtros aplicados"
               : "No hay citas registradas"
           }
+        />
+
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={handlePageChange}
+          show={true}
         />
       </CrudLayout>
 

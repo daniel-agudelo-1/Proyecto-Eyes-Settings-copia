@@ -49,20 +49,11 @@ export const normalizeMarcaForList = (marca) => ({
 });
 
 // ============================
-// Opciones de estado
+// Opciones de estado (para formulario)
 // ============================
 export const estadoOptions = [
   { value: true, label: "Activa" },
   { value: false, label: "Inactiva" }
-];
-
-// ============================
-// Opciones de filtro
-// ============================
-export const searchFilters = [
-  { value: '', label: 'Todos' },
-  { value: 'activa', label: 'Activas' },
-  { value: 'inactiva', label: 'Inactivas' }
 ];
 
 // ============================

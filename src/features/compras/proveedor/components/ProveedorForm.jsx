@@ -198,7 +198,7 @@ export default function ProveedorForm({
         onEdit={onEdit}
         showSave={mode !== "view"}
         showEdit={mode === "view"}
-        saveLabel={submitting ? "Guardando..." : mode === "create" ? "Crear Proveedor" : "Guardar Cambios"}
+        saveLabel={submitting ? "Guardando..." : "Guardar"}
         saveDisabled={submitting}
       />
     </BaseFormLayout>

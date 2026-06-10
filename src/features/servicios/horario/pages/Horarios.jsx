@@ -5,6 +5,7 @@ import CrudLayout from "@shared/components/crud/CrudLayout";
 import UnifiedCrudTable from "@shared/components/crud/CrudTable";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import { useHorarios, useHorarioForm, HorarioForm } from "@horario";
 import "@shared/styles/components/crud-table.css";
 import "@shared/styles/components/modal.css";
@@ -37,6 +38,9 @@ export default function Horarios() {
     filterEstado,
     setFilterEstado,
     estadoFilters,
+    page,
+    setPage,
+    totalPages,
     eliminarHorario,
     cambiarEstado,
     crearHorario,
@@ -134,6 +138,10 @@ export default function Horarios() {
     { label: "Eliminar", type: "delete", onClick: (item) => openDeleteModal(item.id, item.descripcion) },
   ];
 
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+  };
+
   return (
     <>
       <Box sx={{ p: 2, pb: 0 }}>
@@ -193,6 +201,13 @@ export default function Horarios() {
               ? "No se encontraron horarios para los filtros aplicados"
               : "No hay horarios registrados"
           }
+        />
+
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={handlePageChange}
+          show={true}
         />
 
         <Modal

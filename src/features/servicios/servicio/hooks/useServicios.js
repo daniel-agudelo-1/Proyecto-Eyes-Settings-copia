@@ -23,6 +23,7 @@ export const useServicios = () => {
 
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
+  const [page, setPage] = useState(1);
   const [notification, setNotification] = useState({
     isVisible: false,
     message: '',
@@ -43,12 +44,20 @@ export const useServicios = () => {
   const clickLockRef = useRef(false);
   const submitButtonRef = useRef(null);
 
-  // ---------- Queries ----------
-  const { data: serviciosRaw = [], isLoading, error: queryError } = useQuery({
-    queryKey: ['servicios'],
-    queryFn: ServicioData.getAllServicios,
+  // Estado para filtro (activo/inactivo) como string para el backend
+  const estadoParam = filterEstado === 'activo' ? 'activo' : filterEstado === 'inactivo' ? 'inactivo' : '';
+
+  // ---------- Queries con paginación ----------
+  const { data: responseData, isLoading, error: queryError, refetch } = useQuery({
+    queryKey: ['servicios', page, search, estadoParam],
+    queryFn: () => ServicioData.getServicios({ page, per_page: 10, search, estado: estadoParam }),
+    keepPreviousData: true,
     staleTime: 2 * 60 * 1000,
   });
+
+  const serviciosRaw = responseData?.data || [];
+  const pagination = responseData?.pagination || { total_pages: 1, current_page: 1 };
+  const totalPages = pagination.total_pages;
 
   const servicios = serviciosRaw
     .map(servicio => ({
@@ -151,21 +160,18 @@ export const useServicios = () => {
     });
   }, [deleteMutation, executeDelete, showNotification, cleanupModalState]);
 
-  // Función de cambio de estado con validación de citas que bloquean (igual que la versión anterior)
   const cambiarEstado = useCallback(async (row) => {
     await executeStatusChange(async () => {
       const shouldActivate = row.estado !== ESTADO.ACTIVO;
 
-      // Validación antes de desactivar: verificar citas en estados que bloquean
+      // Validación antes de desactivar
       if (!shouldActivate) {
         const estadosQueBloquean = await ServicioData.getEstadosQueBloquean();
         const citasResponse = await axios.get('/citas');
         const citasList = citasResponse.data.data || citasResponse.data || [];
-
         const citasQueBloquean = citasList.filter(cita =>
           cita.servicio_id === row.id && estadosQueBloquean.includes(cita.estado_cita_id)
         );
-
         if (citasQueBloquean.length > 0) {
           const estadosUnicos = [...new Set(citasQueBloquean.map(c => c.estado_nombre))];
           showNotification(
@@ -176,7 +182,6 @@ export const useServicios = () => {
         }
       }
 
-      // Preparar payload con todos los campos (igual que updateServicio)
       const payload = {
         nombre: row.nombre,
         duracion_min: Number(row.duracion_min) || 0,
@@ -184,12 +189,8 @@ export const useServicios = () => {
         descripcion: row.descripcion || '',
         estado: shouldActivate
       };
-
       await updateMutation.mutateAsync({ id: row.id, data: payload });
-      showNotification(
-        `Servicio "${row.nombre}" ${shouldActivate ? 'activado' : 'desactivado'} exitosamente`,
-        'success'
-      );
+      showNotification(`Servicio "${row.nombre}" ${shouldActivate ? 'activado' : 'desactivado'} exitosamente`, 'success');
     });
   }, [executeStatusChange, updateMutation, showNotification]);
 
@@ -218,14 +219,18 @@ export const useServicios = () => {
     cleanupModalState();
   }, [cleanupModalState]);
 
-  // ---------- Filtros y Tabla ----------
-  const filteredServicios = servicios.filter((servicio) => {
-    const matchesSearch = servicio.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      (servicio.descripcion && servicio.descripcion.toLowerCase().includes(search.toLowerCase()));
-    const matchesFilter = !filterEstado || servicio.estado === filterEstado;
-    return matchesSearch && matchesFilter;
-  });
+  // Reiniciar página al cambiar búsqueda o filtro
+  const handleSetSearch = useCallback((value) => {
+    setSearch(value);
+    setPage(1);
+  }, []);
 
+  const handleSetFilterEstado = useCallback((value) => {
+    setFilterEstado(value);
+    setPage(1);
+  }, []);
+
+  // ---------- Filtros y Tabla ----------
   const searchFilters = [
     { value: '', label: 'Todos' },
     { value: ESTADO.ACTIVO, label: 'Activos' },
@@ -238,7 +243,6 @@ export const useServicios = () => {
     { field: 'precio', header: 'Precio', render: (row) => formatCOP(row.precio) }
   ];
 
-  // Acciones de tabla: ya no incluimos "Cambiar estado" porque CrudTable usa onChangeStatus
   const tableActions = [
     { label: 'Ver Detalles', type: 'view', onClick: (item) => handleOpenView(item) },
     { label: 'Editar', type: 'edit', onClick: (item) => handleOpenEdit(item) },
@@ -247,7 +251,10 @@ export const useServicios = () => {
 
   const handleModalConfirm = useCallback(() => {
     if (clickLockRef.current) return;
-    if (modalForm.mode === MODAL_MODE.VIEW) return;
+    if (modalForm.mode === MODAL_MODE.VIEW) {
+      // En modo vista, no hacemos nada; la acción de editar se maneja desde el footer del Dialog
+      return;
+    }
     if (submitButtonRef.current) {
       clickLockRef.current = true;
       submitButtonRef.current.click();
@@ -255,13 +262,16 @@ export const useServicios = () => {
   }, [modalForm.mode]);
 
   return {
-    servicios: filteredServicios,
+    servicios,
     loading: isLoading,
     error: queryError,
     search,
-    setSearch,
+    setSearch: handleSetSearch,
     filterEstado,
-    setFilterEstado,
+    setFilterEstado: handleSetFilterEstado,
+    page,
+    setPage,
+    totalPages,
     searchFilters,
     notification,
     handleCloseNotification,

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createEmpleado, updateEmpleado, checkDocumentoExists, checkEmailExists } from "../services/empleadosService";
 import {
   validateNombre,
+  validateApellido,
   validateDocumento,
   validateTelefono,
   validateEmail,
@@ -11,6 +12,7 @@ import {
 export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitSuccess, onError } = {}) {
   const [formData, setFormData] = useState({
     nombre: "",
+    apellido: "",
     tipoDocumento: "CC",
     numero_documento: "",
     telefono: "",
@@ -26,17 +28,16 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
   const [documentoExists, setDocumentoExists] = useState(false);
   const [emailExists, setEmailExists] = useState(false);
 
-  // ============================
   // Cargar datos iniciales
-  // ============================
   useEffect(() => {
     if (initialData) {
       setFormData({
         nombre: initialData.nombre || "",
+        apellido: initialData.apellido || "",
         tipoDocumento: initialData.tipo_documento || initialData.tipoDocumento || "CC",
         numero_documento: initialData.numero_documento || "",
         telefono: initialData.telefono || "",
-        correo: initialData.correo || initialData.email || "",
+        correo: initialData.correo || "",
         direccion: initialData.direccion || "",
         fecha_ingreso: initialData.fecha_ingreso || "",
         cargo: initialData.cargo || "",
@@ -45,9 +46,7 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
     }
   }, [initialData]);
 
-  // ============================
-  // Verificar documento duplicado (en tiempo real)
-  // ============================
+  // Verificar duplicados
   const verificarDocumentoDuplicado = useCallback(async (numero_documento) => {
     const trimmed = numero_documento?.trim();
     if (trimmed && trimmed.length >= 6) {
@@ -65,9 +64,6 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
     }
   }, [initialData]);
 
-  // ============================
-  // Verificar email duplicado (en tiempo real)
-  // ============================
   const verificarEmailDuplicado = useCallback(async (correo) => {
     const trimmed = correo?.trim();
     if (trimmed && trimmed.includes('@')) {
@@ -85,9 +81,7 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
     }
   }, [initialData]);
 
-  // ============================
   // Handle change
-  // ============================
   const handleChange = useCallback(async (e) => {
     const { name, value } = e.target;
 
@@ -100,7 +94,6 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
 
-    // Verificar duplicados en tiempo real
     if (name === "numero_documento") {
       await verificarDocumentoDuplicado(value);
     }
@@ -109,24 +102,18 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
     }
   }, [errors, verificarDocumentoDuplicado, verificarEmailDuplicado]);
 
-  // ============================
   // Validaciones
-  // ============================
   const validate = useCallback(() => {
     const newErrors = {};
 
-    // Validar nombre
     const nombreValidation = validateNombre(formData.nombre);
-    if (!nombreValidation.isValid) {
-      newErrors.nombre = nombreValidation.message;
-    }
+    if (!nombreValidation.isValid) newErrors.nombre = nombreValidation.message;
 
-    // Validar tipo documento
-    if (!formData.tipoDocumento) {
-      newErrors.tipoDocumento = "Seleccione un tipo de documento";
-    }
+    const apellidoValidation = validateApellido(formData.apellido);
+    if (!apellidoValidation.isValid) newErrors.apellido = apellidoValidation.message;
 
-    // Validar documento
+    if (!formData.tipoDocumento) newErrors.tipoDocumento = "Seleccione un tipo de documento";
+
     const docValidation = validateDocumento(formData.tipoDocumento, formData.numero_documento);
     if (!docValidation.isValid) {
       newErrors.numero_documento = docValidation.message;
@@ -134,13 +121,9 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
       newErrors.numero_documento = "Este número de documento ya está registrado";
     }
 
-    // Validar teléfono
     const telefonoValidation = validateTelefono(formData.telefono);
-    if (!telefonoValidation.isValid) {
-      newErrors.telefono = telefonoValidation.message;
-    }
+    if (!telefonoValidation.isValid) newErrors.telefono = telefonoValidation.message;
 
-    // Validar email
     const emailValidation = validateEmail(formData.correo);
     if (!emailValidation.isValid) {
       newErrors.correo = emailValidation.message;
@@ -148,26 +131,18 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
       newErrors.correo = "Este correo electrónico ya está registrado";
     }
 
-    // Validar cargo
-    if (!formData.cargo) {
-      newErrors.cargo = "Seleccione un cargo";
-    }
+    if (!formData.cargo) newErrors.cargo = "Seleccione un cargo";
 
-    // Validar fecha ingreso
     const fechaValidation = validateFechaIngreso(formData.fecha_ingreso);
-    if (!fechaValidation.isValid) {
-      newErrors.fecha_ingreso = fechaValidation.message;
-    }
+    if (!fechaValidation.isValid) newErrors.fecha_ingreso = fechaValidation.message;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, documentoExists, emailExists]);
 
-  // ============================
   // Submit
-  // ============================
   const handleSubmit = useCallback(async () => {
-    if (!validate()) return;
+    if (!validate()) return null;
 
     setSubmitting(true);
     try {
@@ -175,6 +150,7 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
       if (mode === "create") {
         result = await createEmpleado(formData);
       } else {
+        if (!initialData?.id) throw new Error("ID de empleado no disponible");
         result = await updateEmpleado(initialData.id, formData);
       }
 
@@ -182,7 +158,7 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
       return { success: true, data: result };
     } catch (error) {
       console.error("Error al guardar empleado:", error);
-      const errorMessage = error.response?.data?.message || "Error al guardar el empleado";
+      const errorMessage = error.message || "Error al guardar el empleado";
       onError?.(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
@@ -190,12 +166,11 @@ export function useEmpleadoForm({ mode = "create", initialData = null, onSubmitS
     }
   }, [formData, mode, initialData, validate, onSubmitSuccess, onError]);
 
-  // ============================
   // Reset form
-  // ============================
   const resetForm = useCallback(() => {
     setFormData({
       nombre: "",
+      apellido: "",
       tipoDocumento: "CC",
       numero_documento: "",
       telefono: "",

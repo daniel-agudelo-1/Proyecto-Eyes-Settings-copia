@@ -3,7 +3,8 @@ import api from "../../../../lib/axios";
 export async function getAllHorarios() {
   try {
     const res = await api.get("/horario");
-    return res.data;
+    // El backend devuelve un array de horarios
+    return res.data || [];
   } catch (error) {
     console.error("Error cargando horarios:", error);
     return [];
@@ -30,9 +31,6 @@ export async function getHorariosByEmpleado(empleadoId) {
   }
 }
 
-// ============================
-// CREAR HORARIO (con manejo de errores)
-// ============================
 export async function createHorario(data) {
   const payload = {
     empleado_id: Number(data.empleado_id),
@@ -51,9 +49,6 @@ export async function createHorario(data) {
   }
 }
 
-// ============================
-// ACTUALIZAR HORARIO
-// ============================
 export async function updateHorario(id, data) {
   const payload = {
     empleado_id: Number(data.empleado_id),
@@ -73,9 +68,6 @@ export async function updateHorario(id, data) {
   }
 }
 
-// ============================
-// ELIMINAR HORARIO
-// ============================
 export async function deleteHorario(id) {
   try {
     const res = await api.delete(`/horario/${id}`);
@@ -87,9 +79,6 @@ export async function deleteHorario(id) {
   }
 }
 
-// ============================
-// ACTUALIZAR SOLO ESTADO
-// ============================
 export async function updateEstadoHorario(id, activo) {
   const horario = await getHorarioById(id);
   if (!horario) return { success: false, error: "Horario no encontrado" };

@@ -12,6 +12,10 @@ export async function getAllEmpleados() {
 // Obtener empleado por ID
 // ============================
 export async function getEmpleadoById(id) {
+  if (!id || isNaN(Number(id))) {
+    console.error("ID inválido:", id);
+    return null;
+  }
   try {
     const res = await api.get(`/empleados/${id}`);
     return res.data;
@@ -27,6 +31,7 @@ export async function getEmpleadoById(id) {
 export async function createEmpleado(data) {
   const payload = {
     nombre: data.nombre,
+    apellido: data.apellido,
     tipo_documento: data.tipoDocumento,
     numero_documento: data.numero_documento,
     telefono: data.telefono,
@@ -50,8 +55,12 @@ export async function createEmpleado(data) {
 // Actualizar empleado
 // ============================
 export async function updateEmpleado(id, data) {
+  if (!id || isNaN(Number(id))) {
+    throw new Error("ID de empleado inválido");
+  }
   const payload = {
     nombre: data.nombre,
+    apellido: data.apellido,
     tipo_documento: data.tipoDocumento,
     numero_documento: data.numero_documento,
     telefono: data.telefono,
@@ -75,6 +84,9 @@ export async function updateEmpleado(id, data) {
 // Eliminar empleado
 // ============================
 export async function deleteEmpleado(id) {
+  if (!id || isNaN(Number(id))) {
+    throw new Error("ID de empleado inválido");
+  }
   try {
     const res = await api.delete(`/empleados/${id}`);
     return res.data;
@@ -88,6 +100,9 @@ export async function deleteEmpleado(id) {
 // Cambiar estado empleado
 // ============================
 export async function updateEstadoEmpleado(id, nuevoEstado) {
+  if (!id || isNaN(Number(id))) {
+    throw new Error("ID de empleado inválido");
+  }
   const payload = {
     estado: nuevoEstado === "activo"
   };

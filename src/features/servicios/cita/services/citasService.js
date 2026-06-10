@@ -1,15 +1,26 @@
 import api from "../../../../lib/axios";
 
 // ============================
-// Obtener todas las citas (paginado)
+// Obtener todas las citas con paginación y filtros
 // ============================
-export async function getAllCitas(page = 1, perPage = 10) {
-  const res = await api.get(`/citas?page=${page}&per_page=${perPage}`);
-  return res.data;  // { data, total, page, per_page, total_pages }
+export async function getAllCitas({
+  page = 1,
+  perPage = 10,
+  search = "",
+  estado_cita_id = "",
+}) {
+  const params = new URLSearchParams();
+  params.append("page", page);
+  params.append("per_page", perPage);
+  if (search) params.append("search", search);
+  if (estado_cita_id) params.append("estado_cita_id", estado_cita_id);
+
+  const res = await api.get(`/citas?${params.toString()}`);
+  return res.data; // { data, total, page, per_page, total_pages }
 }
 
 // ============================
-// Obtener cita por ID (endpoint específico)
+// Obtener cita por ID
 // ============================
 export async function getCitaById(id) {
   try {
@@ -26,7 +37,6 @@ export async function getCitaById(id) {
 // ============================
 export async function verificarDisponibilidad(empleadoId, fecha, hora, duracion = 30, excludeCitaId = null) {
   try {
-    // Formatear fecha a YYYY-MM-DD
     let fechaFormateada;
     if (fecha instanceof Date) {
       const year = fecha.getFullYear();
@@ -37,14 +47,12 @@ export async function verificarDisponibilidad(empleadoId, fecha, hora, duracion 
       fechaFormateada = fecha;
     }
 
-    // Formatear hora a HH:MM (sin segundos ni zona horaria)
     let horaFormateada;
     if (hora instanceof Date) {
       const hours = String(hora.getHours()).padStart(2, '0');
       const minutes = String(hora.getMinutes()).padStart(2, '0');
       horaFormateada = `${hours}:${minutes}`;
     } else if (typeof hora === 'string' && hora.includes('T')) {
-      // Si viene en formato ISO, extraer HH:MM
       const dateObj = new Date(hora);
       const hours = String(dateObj.getHours()).padStart(2, '0');
       const minutes = String(dateObj.getMinutes()).padStart(2, '0');
@@ -71,7 +79,7 @@ export async function verificarDisponibilidad(empleadoId, fecha, hora, duracion 
 }
 
 // ============================
-// Crear cita (con manejo de errores)
+// Crear cita
 // ============================
 export async function createCita(data) {
   const payload = {

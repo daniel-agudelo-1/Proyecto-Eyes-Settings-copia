@@ -1,16 +1,23 @@
 import { useNavigate } from "react-router-dom";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import { useVentas } from "../hooks/useVentas";
 import "@shared/styles/components/crud-table.css";
 
 export default function Ventas() {
   const navigate = useNavigate();
   const {
-    ventas, loading,
-    search, setSearch,
-    filterEstado, setFilterEstado,
+    ventas,
+    loading,
+    search,
+    setSearch,
+    filterEstado,
+    setFilterEstado,
     estadoFilters,
+    page,
+    setPage,
+    pagination,
     formatCurrency,
     COLORES_ESTADO_VENTA,
     getEstadoLabelVenta,
@@ -30,9 +37,23 @@ export default function Ventas() {
     {
       header: "Tipo",
       render: (row) => {
-        if (row.esCita)    return <span style={{ fontSize: "0.8rem", color: "#6366f1", fontWeight: 600 }}>Cita</span>;
-        if (row.esPedido)  return <span style={{ fontSize: "0.8rem", color: "#0891b2", fontWeight: 600 }}>Pedido</span>;
-        return <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 600 }}>Directa</span>;
+        if (row.esCita)
+          return (
+            <span style={{ fontSize: "0.8rem", color: "#6366f1", fontWeight: 600 }}>
+              Cita
+            </span>
+          );
+        if (row.esPedido)
+          return (
+            <span style={{ fontSize: "0.8rem", color: "#0891b2", fontWeight: 600 }}>
+              Pedido
+            </span>
+          );
+        return (
+          <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 600 }}>
+            Directa
+          </span>
+        );
       },
     },
     {
@@ -44,19 +65,30 @@ export default function Ventas() {
       field: "metodo_pago",
       header: "Pago",
       render: (row) => (
-        <span style={{ textTransform: "capitalize" }}>{row.metodo_pago || "—"}</span>
+        <span style={{ textTransform: "capitalize" }}>
+          {row.metodo_pago || "—"}
+        </span>
       ),
     },
     {
       header: "Estado",
       render: (row) => {
-        const estilo = COLORES_ESTADO_VENTA[row.estado] ?? { bg: "#f3f4f6", color: "#374151" };
+        const estilo = COLORES_ESTADO_VENTA[row.estado] ?? {
+          bg: "#f3f4f6",
+          color: "#374151",
+        };
         return (
-          <span style={{
-            background: estilo.bg, color: estilo.color,
-            padding: "3px 10px", borderRadius: 99,
-            fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap",
-          }}>
+          <span
+            style={{
+              background: estilo.bg,
+              color: estilo.color,
+              padding: "3px 10px",
+              borderRadius: 99,
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
             {getEstadoLabelVenta(row.estado)}
           </span>
         );
@@ -73,31 +105,39 @@ export default function Ventas() {
   ];
 
   return (
-    <CrudLayout
-      title="Ventas"
-      onAddClick={() => navigate("crear")}
-      addButtonLabel="Nueva Venta"
-      showSearch
-      searchPlaceholder="Buscar por cliente..."
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchFilters={estadoFilters}
-      filterEstado={filterEstado}
-      onFilterChange={setFilterEstado}
-      searchPosition="left"
-    >
-      <CrudTable
-        columns={columns}
-        data={ventas}
-        actions={tableActions}
-        loading={loading}
-        showStatusColumn={false}
-        emptyMessage={
-          search || filterEstado
-            ? "No se encontraron ventas para los filtros aplicados"
-            : "No hay ventas registradas"
-        }
-      />
-    </CrudLayout>
+    <>
+      <CrudLayout
+        title="Ventas"
+        onAddClick={() => navigate("crear")}
+        addButtonLabel="Nueva Venta"
+        showSearch
+        searchPlaceholder="Buscar por cliente..."
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchFilters={estadoFilters}
+        filterEstado={filterEstado}
+        onFilterChange={setFilterEstado}
+        searchPosition="left"
+      >
+        <CrudTable
+          columns={columns}
+          data={ventas}
+          actions={tableActions}
+          loading={loading}
+          showStatusColumn={false}
+          emptyMessage={
+            search || filterEstado
+              ? "No se encontraron ventas para los filtros aplicados"
+              : "No hay ventas registradas"
+          }
+        />
+
+        <CrudPagination
+          totalPages={pagination?.total_pages ?? 1}
+          page={page}
+          onChange={setPage}
+        />
+      </CrudLayout>
+    </>
   );
 }

@@ -8,10 +8,10 @@ export const TIPOS_DOCUMENTO = {
 
 // Placeholder de ejemplo por tipo de documento
 export const DOC_PLACEHOLDERS = {
-  CC:        '12345678',
-  CE:        '123456789012',
-  PASAPORTE: 'AB123456',
-  PEP:       'PEP2023001',
+  CC:        'Ej: 12345678',
+  CE:        'Ej: 123456789012',
+  PASAPORTE: 'Ej: AB123456',
+  PEP:       'Ej: PEP2023001',
 };
 
 // Devuelve el estado inicial del formulario de registro

@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { marcasService } from '../services/marcasService';
-import { normalizeMarcaForList, searchFilters, columns } from '../utils/marcasUtils';
+import { normalizeMarcaForList } from '../utils/marcasUtils';
 import { useActionBlocker } from '@shared/hooks/useActionBlocker';
 
 export function useMarcas() {
-  const [marcas, setMarcas] = useState([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
   
   const [notification, setNotification] = useState({
     isVisible: false,
@@ -31,9 +31,37 @@ export function useMarcas() {
     nombre: "",
   });
 
-  const { execute: executeDelete, isProcessing: isProcessingDelete } = useActionBlocker();
-  const { execute: executeStatusChange, isProcessing: isProcessingStatus } = useActionBlocker();
+  const { execute: executeDelete } = useActionBlocker();
+  const { execute: executeStatusChange } = useActionBlocker();
   const { execute: executeSave, isProcessing: isProcessingSave } = useActionBlocker();
+
+  const searchFilters = [
+    { value: '', label: 'Todos' },
+    { value: 'activa', label: 'Activas' },
+    { value: 'inactiva', label: 'Inactivas' }
+  ];
+
+  const estadoParam = filterEstado === "activa" ? "activa" : filterEstado === "inactiva" ? "inactiva" : "";
+
+  const {
+    data: responseData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["marcas", page, search, estadoParam],
+    queryFn: () => marcasService.getMarcas({ page, per_page: 10, search, estado: estadoParam }),
+    keepPreviousData: true,
+    staleTime: 1000 * 60,
+  });
+
+  const marcasRaw = responseData?.data || [];
+  const pagination = responseData?.pagination || { total_pages: 1, current_page: 1 };
+  const totalPages = pagination.total_pages;
+
+  const marcas = marcasRaw.map(marca => normalizeMarcaForList(marca));
+  const loading = isLoading;
+  const error = isError ? "No se pudieron cargar las marcas" : null;
 
   const showNotification = useCallback((message, type = "success") => {
     setNotification({ isVisible: true, message, type });
@@ -58,20 +86,19 @@ export function useMarcas() {
     limpiarAriaHidden();
   }, [limpiarAriaHidden]);
 
-  const loadMarcas = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await marcasService.getAllMarcas();
-      const marcasTransformadas = data.map(marca => normalizeMarcaForList(marca));
-      setMarcas(marcasTransformadas);
-      setError(null);
-    } catch {
-      setError("No se pudieron cargar las marcas");
-      showNotification("Error al cargar las marcas", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [showNotification]);
+  const loadMarcas = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["marcas"] });
+  }, [queryClient]);
+
+  const handleSetSearch = useCallback((value) => {
+    setSearch(value);
+    setPage(1);
+  }, []);
+
+  const handleSetFilterEstado = useCallback((value) => {
+    setFilterEstado(value);
+    setPage(1);
+  }, []);
 
   const handleFormSubmit = useCallback(async (data) => {
     await executeSave(async () => {
@@ -127,7 +154,6 @@ export function useMarcas() {
       
       setModalDelete({ open: false, id: null, nombre: "" });
       limpiarAriaHidden();
-      
       await loadMarcas();
       
       showNotification(`Marca "${modalDelete.nombre}" eliminada exitosamente`, "success");
@@ -189,69 +215,23 @@ export function useMarcas() {
     }
   }, [modalForm.mode, handleCloseForm, submitButtonRef, isProcessingSave]);
 
-  const filteredMarcas = useMemo(() => {
-    return marcas.filter((marca) => {
-      const matchesSearch = marca.nombre.toLowerCase().includes(search.toLowerCase());
-      const matchesFilter = !filterEstado || marca.estado === filterEstado;
-      return matchesSearch && matchesFilter;
-    });
-  }, [marcas, search, filterEstado]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      const root = document.getElementById('root');
-      if (root && root.hasAttribute('aria-hidden')) {
-        const modalExists = document.querySelector('.MuiModal-root');
-        if (!modalExists) {
-          root.removeAttribute('aria-hidden');
-          document.body.style.pointerEvents = 'auto';
-        }
-      }
-    }, 400);
-    return () => clearTimeout(timeoutId);
-  }, [marcas]);
-
-  useEffect(() => {
-    loadMarcas();
-  }, [loadMarcas]);
-
-  const tableActions = [
-    {
-      label: "Cambiar estado",
-      type: "toggle-status",
-      onClick: (item) => handleStatusChange(item, undefined),
-    },
-    {
-      label: "Ver Detalles",
-      type: "view",
-      onClick: (item) => handleOpenView(item)
-    },
-    {
-      label: "Editar",
-      type: "edit",
-      onClick: (item) => handleOpenEdit(item)
-    },
-    {
-      label: "Eliminar",
-      type: "delete",
-      onClick: (item) => handleDelete(item.id, item.nombre)
-    },
-  ];
-
   return {
-    marcas: filteredMarcas,
-    allMarcas: marcas,
+    marcas,
     loading,
     error,
     search,
     filterEstado,
+    page,
+    setPage,
+    totalPages,
     notification,
     modalForm,
     modalDelete,
     submitButtonRef,
     isProcessingSave,
-    setSearch,
-    setFilterEstado,
+    searchFilters,
+    setSearch: handleSetSearch,
+    setFilterEstado: handleSetFilterEstado,
     loadMarcas,
     handleFormSubmit,
     handleDelete,
@@ -264,8 +244,5 @@ export function useMarcas() {
     handleCancelDelete,
     handleCloseNotification,
     handleModalConfirm,
-    searchFilters,
-    columns,
-    tableActions,
   };
 }

@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, IconButton, Stack } from "@mui/material";
-import PictureAsPdfOutlinedIcon  from "@mui/icons-material/PictureAsPdfOutlined";
-import RemoveRedEyeOutlinedIcon  from "@mui/icons-material/RemoveRedEyeOutlined";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import RemoveRedEyeOutlinedIcon from "@mui/icons-material/RemoveRedEyeOutlined";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
-import Loading from "@shared/components/ui/Loading";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useCompras } from "../hooks/useCompras";
 import "@shared/styles/components/crud-table.css";
@@ -15,7 +15,9 @@ export default function Compras() {
   const navigate = useNavigate();
 
   const [notification, setNotification] = useState({
-    isVisible: false, message: "", type: "success",
+    isVisible: false,
+    message: "",
+    type: "success",
   });
 
   const showNotification = (message, type = "success") =>
@@ -37,12 +39,22 @@ export default function Compras() {
     compras,
     loading,
     error,
-    search,        setSearch,
-    filterEstado,  setFilterEstado,
+    search,
+    setSearch,
+    filterEstado,
+    setFilterEstado,
     estadoFilters,
+    page,
+    setPage,
+    pagination,
     eliminarCompra,
-    modalDelete,   openDeleteModal, closeDeleteModal,
-    modalAnular,   abrirModalAnular, cerrarModalAnular, confirmarAnular,
+    modalDelete,
+    openDeleteModal,
+    closeDeleteModal,
+    modalAnular,
+    abrirModalAnular,
+    cerrarModalAnular,
+    confirmarAnular,
   } = useCompras();
 
   const confirmDelete = async () => {
@@ -66,8 +78,8 @@ export default function Compras() {
 
   const columns = [
     { field: "proveedorNombre", header: "Proveedor" },
-    { field: "fechaFormateada", header: "Fecha"     },
-    { field: "totalFormateado", header: "Total"     },
+    { field: "fechaFormateada", header: "Fecha" },
+    { field: "totalFormateado", header: "Total" },
     {
       field: "estado",
       header: "Estado",
@@ -79,16 +91,16 @@ export default function Compras() {
             disabled={!completada}
             title={completada ? "Click para anular" : "Compra anulada"}
             style={{
-              minWidth:        95,
-              padding:         "3px 10px",
-              borderRadius:    4,
-              fontSize:        "0.75rem",
-              fontWeight:      600,
-              cursor:          completada ? "pointer" : "default",
-              border:          `1px solid ${completada ? "#16a34a" : "#d1d5db"}`,
+              minWidth: 95,
+              padding: "3px 10px",
+              borderRadius: 4,
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              cursor: completada ? "pointer" : "default",
+              border: `1px solid ${completada ? "#16a34a" : "#d1d5db"}`,
               backgroundColor: completada ? "#f0fdf4" : "#f3f4f6",
-              color:           completada ? "#16a34a" : "#9ca3af",
-              whiteSpace:      "nowrap",
+              color: completada ? "#16a34a" : "#9ca3af",
+              whiteSpace: "nowrap",
             }}
           >
             {completada ? "Completada" : "Anulada"}
@@ -114,7 +126,6 @@ export default function Compras() {
                 </IconButton>
               </span>
             </Tooltip>
-
             <Tooltip title="Generar PDF">
               <span>
                 <IconButton
@@ -131,10 +142,6 @@ export default function Compras() {
       },
     },
   ];
-
-  const tableActions = [];
-
-  const comprasConEstilo = compras.map((c) => ({ ...c }));
 
   return (
     <>
@@ -153,20 +160,20 @@ export default function Compras() {
         {error && <div className="crud-error">⚠️ {error}</div>}
 
         <style>{`
-          .compras-tabla tr:has(button[disabled][style*="9ca3af"]) {
+          .compras-tabla tr:has(td button[disabled]) {
             background-color: #f9fafb !important;
             opacity: 0.65;
-            pointer-events: none;
           }
-          .compras-tabla tr:has(button[disabled][style*="9ca3af"]) td {
+          .compras-tabla tr:has(td button[disabled]) td {
             color: #9ca3af !important;
           }
         `}</style>
+
         <div className="compras-tabla">
           <CrudTable
             columns={columns}
-            data={comprasConEstilo}
-            actions={tableActions}
+            data={compras}
+            actions={[]}
             loading={loading}
             showStatusColumn={false}
             emptyMessage={
@@ -177,30 +184,36 @@ export default function Compras() {
           />
         </div>
 
-        <Modal
-          open={modalDelete.open}
-          type="warning"
-          title="¿Eliminar Compra?"
-          message={`Esta acción eliminará la compra "${modalDelete.numeroCompra}" y no se puede deshacer.`}
-          confirmText="Eliminar"
-          cancelText="Cancelar"
-          showCancel
-          onConfirm={confirmDelete}
-          onCancel={closeDeleteModal}
-        />
-
-        <Modal
-          open={modalAnular.open}
-          type="warning"
-          title="¿Anular Compra?"
-          message="Esta acción anulará la compra de forma permanente. No se podrá revertir."
-          confirmText="Sí, anular"
-          cancelText="Cancelar"
-          showCancel
-          onConfirm={handleConfirmarAnular}
-          onCancel={cerrarModalAnular}
+        <CrudPagination
+          totalPages={pagination?.total_pages ?? 1}
+          page={page}
+          onChange={setPage}
         />
       </CrudLayout>
+
+      <Modal
+        open={modalDelete.open}
+        type="warning"
+        title="¿Eliminar Compra?"
+        message={`Esta acción eliminará la compra "${modalDelete.numeroCompra}" y no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        showCancel
+        onConfirm={confirmDelete}
+        onCancel={closeDeleteModal}
+      />
+
+      <Modal
+        open={modalAnular.open}
+        type="warning"
+        title="¿Anular Compra?"
+        message="Esta acción anulará la compra de forma permanente. No se podrá revertir."
+        confirmText="Sí, anular"
+        cancelText="Cancelar"
+        showCancel
+        onConfirm={handleConfirmarAnular}
+        onCancel={cerrarModalAnular}
+      />
 
       <CrudNotification
         isVisible={notification.isVisible}

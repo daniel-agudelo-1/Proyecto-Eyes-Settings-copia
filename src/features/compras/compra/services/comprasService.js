@@ -1,7 +1,49 @@
 import api from '@lib/axios';
 import { getAllProveedores } from '../../proveedor/services/proveedoresService';
 
-// ── Obtener todas las compras ─────────────────────────────────────────────────
+// ── Obtener compras con paginación y filtros ───────────────────────────────────
+export async function getCompras({ page = 1, per_page = 10, search = '', estado_compra = null } = {}) {
+  try {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('per_page', per_page);
+    if (search) params.append('search', search);
+    if (estado_compra !== null) params.append('estado_compra', estado_compra ? 'true' : 'false');
+
+    const comprasRes = await api.get(`/compras?${params.toString()}`);
+    const comprasData = comprasRes.data;
+
+    // Obtener proveedores para mapear nombres
+    const proveedoresRes = await getAllProveedores();
+    const proveedoresMap = {};
+    proveedoresRes.forEach((p) => {
+      proveedoresMap[p.id] = p.razon_social_o_nombre || p.razonSocial || p.nombre || '';
+    });
+
+    let comprasList = [];
+    let pagination = { current_page: 1, total_pages: 1, total: 0, has_next: false, has_prev: false };
+
+    if (comprasData && typeof comprasData === 'object' && 'data' in comprasData) {
+      comprasList = comprasData.data.map((c) => ({
+        ...c,
+        proveedor_nombre: proveedoresMap[c.proveedor_id] || 'Proveedor no encontrado',
+      }));
+      pagination = comprasData.pagination;
+    } else if (Array.isArray(comprasData)) {
+      comprasList = comprasData.map((c) => ({
+        ...c,
+        proveedor_nombre: proveedoresMap[c.proveedor_id] || 'Proveedor no encontrado',
+      }));
+    }
+
+    return { data: comprasList, pagination };
+  } catch (error) {
+    console.error('Error en getCompras:', error);
+    throw error;
+  }
+}
+
+// ── Mantener getAllCompras para compatibilidad ─────────────────────────────────
 export async function getAllCompras() {
   try {
     const [comprasRes, proveedoresRes] = await Promise.all([
@@ -16,8 +58,7 @@ export async function getAllCompras() {
 
     return comprasRes.data.map((compra) => ({
       ...compra,
-      proveedor_nombre:
-        proveedoresMap[compra.proveedor_id] || 'Proveedor no encontrado',
+      proveedor_nombre: proveedoresMap[compra.proveedor_id] || 'Proveedor no encontrado',
     }));
   } catch (error) {
     console.error('Error en getAllCompras:', error);
@@ -44,8 +85,7 @@ export async function getCompraById(id) {
 
     return {
       ...compra,
-      proveedor_nombre:
-        proveedoresMap[compra.proveedor_id] || 'Proveedor no encontrado',
+      proveedor_nombre: proveedoresMap[compra.proveedor_id] || 'Proveedor no encontrado',
       productos: detalles.map((d) => ({
         id:           d.id,
         productoId:   d.producto_id,
@@ -53,10 +93,7 @@ export async function getCompraById(id) {
         cantidad:     Number(d.cantidad),
         precioCompra: Number(d.precio_unitario ?? d.precio_unidad ?? 0),
         precioVenta:  Number(d.precio_venta    ?? d.producto?.precio_venta ?? 0),
-        total:        Number(
-          d.subtotal ??
-          Number(d.cantidad) * Number(d.precio_unitario ?? d.precio_unidad ?? 0)
-        ),
+        total:        Number(d.subtotal ?? Number(d.cantidad) * Number(d.precio_unitario ?? d.precio_unidad ?? 0)),
         stockActual:  Number(d.producto?.stock ?? 0),
       })),
     };
@@ -68,7 +105,6 @@ export async function getCompraById(id) {
 }
 
 // ── Crear compra ──────────────────────────────────────────────────────────────
-// El backend maneja el incremento de stock en el mismo POST /compras
 export async function createCompra(data) {
   try {
     const payload = {
@@ -92,7 +128,6 @@ export async function createCompra(data) {
 }
 
 // ── Actualizar compra ─────────────────────────────────────────────────────────
-// [REVISAR] Confirma el endpoint PUT /compras/:id con tu backend Flask.
 export async function updateCompra(id, data) {
   try {
     const payload = {
@@ -128,7 +163,6 @@ export async function deleteCompra(id) {
 }
 
 // ── Anular compra ─────────────────────────────────────────────────────────────
-// PUT /compras/:id  { estado_compra: false }
 export async function anularCompra(id) {
   try {
     const res = await api.put(`/compras/${id}`, { estado_compra: false });

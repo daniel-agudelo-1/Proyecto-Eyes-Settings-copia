@@ -53,10 +53,10 @@ export default function EmpleadoForm({
           />
         </Box>
 
-        {/* Nombre Completo */}
+        {/* Nombre */}
         <BaseFormField>
           <BaseInputField
-            label="Nombre Completo"
+            label="Nombre"
             name="nombre"
             value={formData.nombre}
             onChange={handleChange}
@@ -64,6 +64,21 @@ export default function EmpleadoForm({
             required
             error={!!errors.nombre}
             helperText={errors.nombre}
+            fullWidth
+          />
+        </BaseFormField>
+
+        {/* Apellido */}
+        <BaseFormField>
+          <BaseInputField
+            label="Apellido"
+            name="apellido"
+            value={formData.apellido}
+            onChange={handleChange}
+            disabled={isDisabled}
+            required
+            error={!!errors.apellido}
+            helperText={errors.apellido}
             fullWidth
           />
         </BaseFormField>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAllNovedades,
@@ -6,51 +6,18 @@ import {
   updateNovedad,
   deleteNovedad,
 } from '../services/novedadesService';
-import { getEmpleadosAgenda } from '@servicios/agenda'; // ✔️ nombre correcto
+import { getEmpleadosAgenda } from '@servicios/agenda';
 import { normalizeNovedadesForList } from '../utils/novedadesUtils';
+
+const PAGE_SIZE = 10; // elementos por página
 
 export function useNovedades() {
   const queryClient = useQueryClient();
 
-  // Empleados (comparte caché con agenda)
-  const { data: empleados = [] } = useQuery({
-    queryKey: ['empleados-agenda'],
-    queryFn: getEmpleadosAgenda, // ✔️ corregido
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // Novedades
-  const {
-    data: novedadesRaw = [],
-    isLoading: loadingNovedades,
-    error: novedadesError,
-  } = useQuery({
-    queryKey: ['novedades'],
-    queryFn: getAllNovedades,
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const novedadesNormalizadas = normalizeNovedadesForList(novedadesRaw, empleados);
-
-  // Mutaciones
-  const createMutation = useMutation({
-    mutationFn: createNovedad,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novedades'] }),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updateNovedad(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novedades'] }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteNovedad,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novedades'] }),
-  });
-
-  // Estados de UI (filtros y modales)
+  // Estados de UI
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState('');
+  const [filterEstado, setFilterEstado] = useState(''); // '', 'activo', 'inactivo'
   const [modalForm, setModalForm] = useState({
     open: false,
     mode: 'create',
@@ -63,30 +30,92 @@ export function useNovedades() {
     descripcion: '',
   });
 
-  // Filtrado
-  const novedadesFiltradas = novedadesNormalizadas.filter((n) => {
-    const matchesSearch =
-      n.empleado_nombre?.toLowerCase().includes(search.toLowerCase()) ||
-      n.tipo_label?.toLowerCase().includes(search.toLowerCase()) ||
-      n.motivo?.toLowerCase().includes(search.toLowerCase());
-    const matchesEstado = !filterEstado || n.estado === filterEstado;
-    return matchesSearch && matchesEstado;
+  // Empleados
+  const { data: empleados = [] } = useQuery({
+    queryKey: ['empleados-agenda'],
+    queryFn: getEmpleadosAgenda,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Novedades (todas)
+  const {
+    data: novedadesRaw = [],
+    isLoading: loadingNovedades,
+    error: novedadesError,
+    refetch,
+  } = useQuery({
+    queryKey: ['novedades'],
+    queryFn: getAllNovedades,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const novedadesNormalizadas = useMemo(() => {
+    return normalizeNovedadesForList(novedadesRaw, empleados);
+  }, [novedadesRaw, empleados]);
+
+  // Filtrado local
+  const novedadesFiltradas = useMemo(() => {
+    let filtered = novedadesNormalizadas;
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      filtered = filtered.filter(n =>
+        n.empleado_nombre?.toLowerCase().includes(lowerSearch) ||
+        n.tipo_label?.toLowerCase().includes(lowerSearch) ||
+        n.motivo?.toLowerCase().includes(lowerSearch)
+      );
+    }
+    if (filterEstado) {
+      filtered = filtered.filter(n => n.estado === filterEstado);
+    }
+    return filtered;
+  }, [novedadesNormalizadas, search, filterEstado]);
+
+  // Paginación local
+  const totalItems = novedadesFiltradas.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paginatedNovedades = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return novedadesFiltradas.slice(start, end);
+  }, [novedadesFiltradas, page]);
+
+  // Mutaciones
+  const createMutation = useMutation({
+    mutationFn: createNovedad,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['novedades'] });
+      if (paginatedNovedades.length === PAGE_SIZE && totalItems % PAGE_SIZE === 0) {
+        setPage(totalPages + 1);
+      }
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => updateNovedad(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novedades'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteNovedad,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['novedades'] });
+      if (paginatedNovedades.length === 1 && page > 1) {
+        setPage(page - 1);
+      }
+    },
   });
 
   // Wrappers
   const crearNovedad = useCallback(async (data) => {
-    const result = await createMutation.mutateAsync(data);
-    return result;
+    return await createMutation.mutateAsync(data);
   }, [createMutation]);
 
   const editarNovedad = useCallback(async (id, data) => {
-    const result = await updateMutation.mutateAsync({ id, data });
-    return result;
+    return await updateMutation.mutateAsync({ id, data });
   }, [updateMutation]);
 
   const eliminarNovedad = useCallback(async (id) => {
-    const result = await deleteMutation.mutateAsync(id);
-    return result;
+    return await deleteMutation.mutateAsync(id);
   }, [deleteMutation]);
 
   const cambiarEstado = useCallback(async (item, nuevoEstado) => {
@@ -102,11 +131,10 @@ export function useNovedades() {
       motivo: item.motivo,
       activo,
     };
-    const result = await updateMutation.mutateAsync({ id: item.id, data: payload });
-    return result;
+    return await updateMutation.mutateAsync({ id: item.id, data: payload });
   }, [updateMutation]);
 
-  // Handlers de modales
+  // Handlers de modales (igual que antes)
   const openCreateModal = useCallback(() => {
     setModalForm({ open: true, mode: 'create', title: 'Crear Novedad', initialData: null });
   }, []);
@@ -169,24 +197,32 @@ export function useNovedades() {
   ];
 
   const recargar = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['novedades'] });
-  }, [queryClient]);
+    refetch();
+  }, [refetch]);
 
   return {
-    novedades: novedadesFiltradas,
+    novedades: paginatedNovedades,
     empleados,
     loading: loadingNovedades,
     error: novedadesError,
+    // Paginación
+    page,
+    setPage,
+    perPage: PAGE_SIZE,
+    totalPages,
+    // Filtros
     search,
     setSearch,
     filterEstado,
     setFilterEstado,
     estadoFilters,
+    // Acciones
     eliminarNovedad,
     cambiarEstado,
     crearNovedad,
     editarNovedad,
     recargar,
+    // Modales
     modalForm,
     modalDelete,
     openCreateModal,

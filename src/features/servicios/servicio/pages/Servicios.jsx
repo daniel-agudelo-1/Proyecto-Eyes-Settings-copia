@@ -1,6 +1,7 @@
-import { Alert, Box, Button } from '@mui/material';
+import { Alert, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import CrudLayout from '@shared/components/crud/CrudLayout';
 import CrudTable from '@shared/components/crud/CrudTable';
+import CrudPagination from '@shared/components/crud/CrudPagination';
 import Modal from '@shared/components/ui/Modal';
 import ServicioForm from '../components/ServicioForm';
 import CrudNotification from '@shared/styles/components/notifications/CrudNotification';
@@ -18,6 +19,9 @@ export default function Servicios() {
     setSearch,
     filterEstado,
     setFilterEstado,
+    page,
+    setPage,
+    totalPages,
     notification,
     modalForm,
     modalDelete,
@@ -39,6 +43,7 @@ export default function Servicios() {
   } = useServicios();
 
   const isProcessing = modalForm.mode !== 'view' && isSaving;
+  const isViewMode = modalForm.mode === 'view';
 
   const handleFormSubmit = async (data) => {
     if (modalForm.mode === 'create') {
@@ -48,18 +53,16 @@ export default function Servicios() {
     }
   };
 
-  // Función para cerrar vista y abrir edición
   const handleEditFromView = () => {
     const viewData = modalForm.initialData;
-    handleCloseForm();               // cierra modal de vista
-    handleOpenEdit(viewData);        // abre modal de edición con los mismos datos
+    handleCloseForm();
+    handleOpenEdit(viewData);
   };
 
   const handleModalConfirmClick = () => {
     if (modalForm.mode === 'view') {
       handleEditFromView();
     } else {
-      // Disparar el submit del formulario
       if (submitButtonRef.current) {
         submitButtonRef.current.click();
       }
@@ -97,11 +100,18 @@ export default function Servicios() {
               : 'No hay servicios registrados'
           }
         />
-        
+
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={setPage}
+          show={true}
+        />
+
         <Modal
           open={modalDelete.open}
           type="warning"
-          title="¿Eliminar Servicio?"
+          title="Eliminar Servicio"
           message={
             <>
               Esta acción eliminará el servicio{' '}
@@ -119,31 +129,88 @@ export default function Servicios() {
         />
       </CrudLayout>
 
-      <Modal
-        open={modalForm.open}
-        type="info"
-        title={modalForm.title}
-        confirmText={modalForm.mode === 'view' ? 'Editar' : 'Guardar'}
-        cancelText={modalForm.mode === 'view' ? 'Cerrar' : 'Cancelar'}
-        showCancel={true}
-        onConfirm={handleModalConfirmClick}
-        onCancel={handleCloseForm}
-        confirmButtonColor={BRAND_COLOR}
-        confirmButtonHoverColor={BRAND_HOVER}
-        confirmDisabled={isProcessing}
-        maxWidth="md"
-        PaperProps={{ sx: { width: '100%' } }}
-      >
-        <ServicioForm
-          id="servicio-form"
-          mode={modalForm.mode}
-          initialData={modalForm.initialData}
-          onSubmit={handleFormSubmit}
+      {/* Modal para crear/editar (componente compartido) */}
+      {!isViewMode && (
+        <Modal
+          open={modalForm.open}
+          type="info"
+          title={modalForm.title}
+          confirmText="Guardar"
+          cancelText="Cancelar"
+          showCancel
+          onConfirm={handleModalConfirm}
           onCancel={handleCloseForm}
-          embedded
-          submitButtonRef={submitButtonRef}
-        />
-      </Modal>
+          confirmButtonColor={BRAND_COLOR}
+          confirmButtonHoverColor={BRAND_HOVER}
+          confirmDisabled={isProcessing}
+          maxWidth="md"
+        >
+          <ServicioForm
+            id="servicio-form"
+            mode={modalForm.mode}
+            initialData={modalForm.initialData}
+            onSubmit={handleFormSubmit}
+            onCancel={handleCloseForm}
+            embedded
+            submitButtonRef={submitButtonRef}
+          />
+        </Modal>
+      )}
+
+      {/* Dialog personalizado para modo vista con botones: Cerrar (outlined) y Editar (contained) */}
+      {isViewMode && (
+        <Dialog
+          open={modalForm.open}
+          onClose={handleCloseForm}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 2 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 700, fontSize: '1rem', pb: 1 }}>
+            {modalForm.title}
+          </DialogTitle>
+          <DialogContent sx={{ pt: '8px !important' }}>
+            <ServicioForm
+              id="servicio-form-view"
+              mode="view"
+              initialData={modalForm.initialData}
+              onSubmit={handleFormSubmit}
+              onCancel={handleCloseForm}
+              embedded
+              submitButtonRef={submitButtonRef}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={handleCloseForm}
+              sx={{
+                color: BRAND_COLOR,
+                borderColor: BRAND_COLOR,
+                '&:hover': {
+                  backgroundColor: 'rgba(26, 37, 64, 0.04)',
+                  borderColor: BRAND_HOVER,
+                  color: BRAND_HOVER,
+                },
+                textTransform: 'none',
+              }}
+            >
+              Cerrar
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleEditFromView}
+              sx={{
+                backgroundColor: BRAND_COLOR,
+                '&:hover': { backgroundColor: BRAND_HOVER },
+                textTransform: 'none',
+              }}
+            >
+              Editar
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       <CrudNotification
         isVisible={notification.isVisible}

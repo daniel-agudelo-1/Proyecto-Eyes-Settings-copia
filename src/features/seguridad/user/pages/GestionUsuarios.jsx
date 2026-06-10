@@ -1,21 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pagination, Box } from "@mui/material";
-
-import CrudLayout       from "@shared/components/crud/CrudLayout";
-import CrudTable        from "@shared/components/crud/CrudTable";
-import Modal            from "@shared/components/ui/Modal";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import CrudLayout from "@shared/components/crud/CrudLayout";
+import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
+import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
-
 import { deleteUser, updateEstadoUser, getAllRoles } from "@seguridad";
 import { useUsuariosList } from "../hooks/useUsuariosList";
-import { useQuery } from "@tanstack/react-query";
 
 const STATUS_FILTERS = [
-  { value: "", label: "Todos los estados" },
-  { value: "activo", label: "Activos" },
-  { value: "inactivo", label: "Inactivos" },
+  { value: "",         label: "Todos los estados" },
+  { value: "activo",   label: "Activos"           },
+  { value: "inactivo", label: "Inactivos"         },
 ];
 
 export default function GestionUsuarios() {
@@ -33,7 +30,6 @@ export default function GestionUsuarios() {
     setSearch,
     filterEstado,
     setFilterEstado,
-    refetch,
   } = useUsuariosList();
 
   const [deleteModal, setDeleteModal] = useState({ open: false, id: null, name: "" });
@@ -44,7 +40,6 @@ export default function GestionUsuarios() {
   const handleCloseNotification = () =>
     setNotification((prev) => ({ ...prev, isVisible: false }));
 
-  // Obtener roles para mostrar nombres
   const { data: roles = [] } = useQuery({
     queryKey: ["roles"],
     queryFn: getAllRoles,
@@ -94,8 +89,8 @@ export default function GestionUsuarios() {
   };
 
   const columns = [
-    { field: "nombre", header: "Nombre", render: (item) => item.nombre },
-    { field: "correo", header: "Correo", render: (item) => item.correo },
+    { field: "nombre", header: "Nombre",  render: (item) => item.nombre },
+    { field: "correo", header: "Correo",  render: (item) => item.correo },
     {
       field: "rol_id",
       header: "Rol",
@@ -104,9 +99,9 @@ export default function GestionUsuarios() {
   ];
 
   const tableActions = [
-    { label: "Ver detalles", type: "view", onClick: (row) => navigate(`detalle/${row.id}`) },
-    { label: "Editar", type: "edit", onClick: (row) => navigate(`editar/${row.id}`) },
-    { label: "Eliminar", type: "delete", onClick: (row) => handleDelete(row.id, row.nombre) },
+    { label: "Ver detalles", type: "view",   onClick: (row) => navigate(`detalle/${row.id}`) },
+    { label: "Editar",       type: "edit",   onClick: (row) => navigate(`editar/${row.id}`)  },
+    { label: "Eliminar",     type: "delete", onClick: (row) => handleDelete(row.id, row.nombre) },
   ];
 
   return (
@@ -123,7 +118,15 @@ export default function GestionUsuarios() {
         onFilterChange={setFilterEstado}
       >
         {error && (
-          <div style={{ padding: 16, backgroundColor: "#ffebee", color: "#c62828", borderRadius: 4, marginBottom: 16 }}>
+          <div
+            style={{
+              padding: 16,
+              backgroundColor: "#ffebee",
+              color: "#c62828",
+              borderRadius: 4,
+              marginBottom: 16,
+            }}
+          >
             ⚠️ {error?.message || "No se pudieron cargar los usuarios"}
           </div>
         )}
@@ -141,28 +144,25 @@ export default function GestionUsuarios() {
           }
         />
 
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 3, mb: 2 }}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(e, value) => setPage(value)}
-            color="primary"
-            size="small"
-          />
-        </Box>
-      </CrudLayout>
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={setPage}
+          show={true}
+        />
 
-      <Modal
-        open={deleteModal.open}
-        type="warning"
-        title="¿Eliminar Usuario?"
-        message={`Esta acción eliminará al usuario "${deleteModal.name}" y no se puede deshacer.`}
-        confirmText="Eliminar"
-        cancelText="Cancelar"
-        showCancel
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteModal({ open: false, id: null, name: "" })}
-      />
+        <Modal
+          open={deleteModal.open}
+          type="warning"
+          title="¿Eliminar Usuario?"
+          message={`Esta acción eliminará al usuario "${deleteModal.name}" y no se puede deshacer.`}
+          confirmText="Eliminar"
+          cancelText="Cancelar"
+          showCancel
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteModal({ open: false, id: null, name: "" })}
+        />
+      </CrudLayout>
 
       <CrudNotification
         isVisible={notification.isVisible}

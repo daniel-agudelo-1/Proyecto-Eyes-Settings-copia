@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { Pagination, Typography, Box, Button, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useProductos } from "../hooks/useProductos";
@@ -141,21 +142,11 @@ export default function Productos() {
           onChangeStatus={cambiarEstado}
         />
         
-        {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 2 }}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(e, value) => setPage(value)}
-            color="primary"
-            size="small"
-            showFirstButton={false}
-            showLastButton={false}
-            siblingCount={1}
-            boundaryCount={1}
-          />
-        </Box>
-      )}
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={setPage}
+        />
 
         <Modal
           open={modalDelete.open}

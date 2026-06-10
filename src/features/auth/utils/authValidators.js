@@ -1,5 +1,11 @@
-const EMAIL_REGEX    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PASSWORD_REGEX = /^.{6,}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Lista de patrones débiles comunes
+const WEAK_PATTERNS = [
+  'password', 'contraseña', '123456', '12345678', '12345', '123456789',
+  'qwerty', 'abc123', 'admin', 'letmein', 'welcome', 'monkey', 'dragon',
+  'master', 'hello', 'football', 'baseball', 'shadow', 'sunshine'
+];
 
 const DOC_VALIDATIONS = {
   CC:        /^\d{8,10}$/,
@@ -15,10 +21,69 @@ const DOC_ERRORS = {
   PEP:       'El PEP debe tener entre 6 y 15 caracteres alfanuméricos',
 };
 
-// Calcula la edad a partir de una fecha de nacimiento
+// ============================================================
+// FUNCIONES DE VALIDACIÓN DE FORTALEZA DE CONTRASEÑA
+// ============================================================
+
+// Detectar secuencias (abc, 123, qwert, etc.)
+const hasSequence = (str, len = 3) => {
+  const lower = str.toLowerCase();
+  for (let i = 0; i <= lower.length - len; i++) {
+    const sub = lower.slice(i, i + len);
+    // Secuencia numérica ascendente
+    if (/^[0-9]{3}$/.test(sub) && parseInt(sub[2]) === parseInt(sub[1]) + 1 && parseInt(sub[1]) === parseInt(sub[0]) + 1) return true;
+    // Secuencia numérica descendente
+    if (/^[0-9]{3}$/.test(sub) && parseInt(sub[2]) === parseInt(sub[1]) - 1 && parseInt(sub[1]) === parseInt(sub[0]) - 1) return true;
+    // Secuencia alfabética ascendente (abc, bcd)
+    if (/^[a-z]{3}$/.test(sub) && sub.charCodeAt(2) === sub.charCodeAt(1) + 1 && sub.charCodeAt(1) === sub.charCodeAt(0) + 1) return true;
+    // Secuencia alfabética descendente (cba, zyx)
+    if (/^[a-z]{3}$/.test(sub) && sub.charCodeAt(2) === sub.charCodeAt(1) - 1 && sub.charCodeAt(1) === sub.charCodeAt(0) - 1) return true;
+    // Teclado QWERTY
+    const qwertyRows = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+    for (const row of qwertyRows) {
+      if (row.includes(sub)) return true;
+    }
+  }
+  return false;
+};
+
+// Detectar repeticiones (aaaa, 1111)
+const hasRepetition = (str, len = 3) => {
+  const regex = new RegExp(`(.)\\1{${len - 1},}`);
+  return regex.test(str);
+};
+
+// Detectar si contiene nombre, apellido o parte del correo
+const containsPersonalInfo = (password, nombre, apellido, correo) => {
+  const lowerPass = password.toLowerCase();
+  const personal = [nombre, apellido, correo?.split('@')[0]].filter(Boolean).map(s => s.toLowerCase());
+  for (const word of personal) {
+    if (word && word.length >= 3 && lowerPass.includes(word)) return true;
+  }
+  return false;
+};
+
+// Función principal: contraseña fuerte
+export const isStrongPassword = (password, nombre = '', apellido = '', correo = '') => {
+  if (password.length < 8) return false;
+  if (!/[A-Z]/.test(password)) return false;
+  if (!/[a-z]/.test(password)) return false;
+  if (!/[0-9]/.test(password)) return false;
+  // Opcional: exigir al menos un símbolo (descomentar si se desea)
+  // if (!/[^A-Za-z0-9]/.test(password)) return false;
+  if (WEAK_PATTERNS.some(p => password.toLowerCase().includes(p))) return false;
+  if (hasSequence(password)) return false;
+  if (hasRepetition(password)) return false;
+  if (containsPersonalInfo(password, nombre, apellido, correo)) return false;
+  return true;
+};
+
+// ============================================================
+// CÁLCULO DE EDAD
+// ============================================================
 export const calcularEdad = (fechaNacimiento) => {
   if (!fechaNacimiento) return 0;
-  const hoy   = new Date();
+  const hoy = new Date();
   const birth = new Date(fechaNacimiento);
   let edad = hoy.getFullYear() - birth.getFullYear();
   const diff = hoy.getMonth() - birth.getMonth();
@@ -80,11 +145,12 @@ export const validateRegisterForm = (formData) => {
     errors.numeroDocumento = DOC_ERRORS[formData.tipoDocumento];
   }
 
-  // Contraseña
-  if (!formData.contrasenia)
+  // Contraseña (validación mejorada)
+  if (!formData.contrasenia) {
     errors.contrasenia = 'La contraseña es requerida';
-  else if (formData.contrasenia.length < 6)
-    errors.contrasenia = 'La contraseña debe tener al menos 6 caracteres';
+  } else if (!isStrongPassword(formData.contrasenia, formData.nombre, formData.apellido, formData.correo)) {
+    errors.contrasenia = 'La contraseña debe tener al menos 8 caracteres, incluir mayúscula, minúscula, número, y no ser una contraseña común (ej: 12345678, password) ni contener tu nombre o correo.';
+  }
 
   // Confirmar contraseña
   if (formData.contrasenia !== formData.confirmContrasenia)
@@ -111,11 +177,12 @@ export const validateOtpCode = (codigo) => {
   return null;
 };
 
-export const validateResetPassword = (nuevaContrasenia, confirmarContrasenia) => {
+export const validateResetPassword = (nuevaContrasenia, confirmarContrasenia, nombre = '', apellido = '', correo = '') => {
   if (!nuevaContrasenia?.trim())
     return 'Ingresa tu nueva contraseña';
-  if (nuevaContrasenia.length < 6)
-    return 'La contraseña debe tener al menos 6 caracteres';
+  if (!isStrongPassword(nuevaContrasenia, nombre, apellido, correo)) {
+    return 'La contraseña debe tener al menos 8 caracteres, incluir mayúscula, minúscula, número, y no ser una contraseña común ni contener tu nombre o correo.';
+  }
   if (nuevaContrasenia !== confirmarContrasenia)
     return 'Las contraseñas no coinciden';
   return null;

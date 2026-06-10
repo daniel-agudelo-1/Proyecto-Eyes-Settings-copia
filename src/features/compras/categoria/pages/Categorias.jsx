@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useActionBlocker } from "@shared/hooks/useActionBlocker";
@@ -35,6 +36,9 @@ export default function Categorias() {
     setSearch,
     filterEstado,
     setFilterEstado,
+    page,
+    setPage,
+    totalPages,
     modalForm,
     modalDelete,
     openCreateModal,
@@ -203,6 +207,13 @@ export default function Categorias() {
               ? "No se encontraron categorías para los filtros aplicados"
               : "No hay categorías registradas"
           }
+        />
+
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={setPage}
+          show={true}
         />
 
         <Modal

@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import CrudLayout from "@shared/components/crud/CrudLayout";
 import CrudTable from "@shared/components/crud/CrudTable";
+import CrudPagination from "@shared/components/crud/CrudPagination";
 import Modal from "@shared/components/ui/Modal";
-import Loading from "@shared/components/ui/Loading";
 import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
 import { useEmpleados } from "../hooks/useEmpleados";
 import "@shared/styles/components/crud-table.css";
@@ -15,23 +15,25 @@ export default function Empleados() {
     empleados,
     loading,
     error,
+    page,
+    setPage,
+    totalPages,
     search,
     setSearch,
     filterEstado,
     setFilterEstado,
+    estadoFilters,
     eliminarEmpleado,
     cambiarEstado,
     modalDelete,
     openDeleteModal,
     closeDeleteModal,
-    recargar,
   } = useEmpleados();
 
-  // Estado para notificaciones (solo para acciones en el listado)
   const [notification, setNotification] = useState({
     isVisible: false,
     message: "",
-    type: "success"
+    type: "success",
   });
 
   const showNotification = (message, type = "success") => {
@@ -39,7 +41,7 @@ export default function Empleados() {
   };
 
   const handleCloseNotification = () => {
-    setNotification(prev => ({ ...prev, isVisible: false }));
+    setNotification((prev) => ({ ...prev, isVisible: false }));
   };
 
   useEffect(() => {
@@ -49,9 +51,6 @@ export default function Empleados() {
     }
   }, [notification.isVisible]);
 
-  // ============================
-  // Handlers de navegación (reemplazan modales)
-  // ============================
   const handleOpenCreate = () => {
     navigate("/admin/servicios/empleados/crear");
   };
@@ -64,9 +63,6 @@ export default function Empleados() {
     navigate(`/admin/servicios/empleados/detalle/${item.id}`);
   };
 
-  // ============================
-  // Eliminar empleado
-  // ============================
   const confirmDelete = async () => {
     const result = await eliminarEmpleado(modalDelete.id);
     if (result.success) {
@@ -77,18 +73,11 @@ export default function Empleados() {
     }
   };
 
-  // ============================
-  // Cambiar estado
-  // ============================
   const handleChangeStatus = async (row, nuevoEstado) => {
-    const estadoFinal = nuevoEstado !== undefined 
-      ? nuevoEstado 
-      : (row.estado === "activo" ? "inactivo" : "activo");
-    
+    const estadoFinal = nuevoEstado !== undefined ? nuevoEstado : row.estado === "activo" ? "inactivo" : "activo";
     const result = await cambiarEstado(row.id, estadoFinal);
-    
     if (result.success) {
-      const mensaje = estadoFinal === "activo" 
+      const mensaje = estadoFinal === "activo"
         ? `Empleado "${row.nombre}" activado exitosamente`
         : `Empleado "${row.nombre}" desactivado exitosamente`;
       showNotification(mensaje, "success");
@@ -97,17 +86,13 @@ export default function Empleados() {
     }
   };
 
-  // ============================
-  // Filtros
-  // ============================
-  const estadoFilters = [
-    { value: "", label: "Todos los estados" },
-    { value: "activo", label: "Activos" },
-    { value: "inactivo", label: "Inactivos" },
-  ];
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+  };
 
   const columns = [
     { field: "nombre", header: "Nombre" },
+    { field: "apellido", header: "Apellido" },
     { field: "cargo", header: "Cargo" },
     { field: "correo", header: "Correo Electrónico" },
   ];
@@ -131,7 +116,7 @@ export default function Empleados() {
     {
       label: "Eliminar",
       type: "delete",
-      onClick: (item) => openDeleteModal(item.id, item.nombre),
+      onClick: (item) => openDeleteModal(item.id, `${item.nombre} ${item.apellido}`),
     },
   ];
 
@@ -149,7 +134,15 @@ export default function Empleados() {
         onFilterChange={setFilterEstado}
       >
         {error && (
-          <div style={{ padding: "16px", backgroundColor: "#ffebee", color: "#c62828", borderRadius: "4px", marginBottom: "16px" }}>
+          <div
+            style={{
+              padding: "16px",
+              backgroundColor: "#ffebee",
+              color: "#c62828",
+              borderRadius: "4px",
+              marginBottom: "16px",
+            }}
+          >
             ⚠️ {error}
           </div>
         )}
@@ -166,9 +159,15 @@ export default function Empleados() {
               : "No hay empleados registrados"
           }
         />
+
+        <CrudPagination
+          totalPages={totalPages}
+          page={page}
+          onChange={handlePageChange}
+          show={true}
+        />
       </CrudLayout>
 
-      {/* MODAL ELIMINAR (se conserva) */}
       <Modal
         open={modalDelete.open}
         type="warning"
@@ -181,7 +180,6 @@ export default function Empleados() {
         onCancel={closeDeleteModal}
       />
 
-      {/* NOTIFICACIONES */}
       <CrudNotification
         isVisible={notification.isVisible}
         message={notification.message}

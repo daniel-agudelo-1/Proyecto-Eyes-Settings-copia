@@ -22,17 +22,19 @@ export const horaA12 = (hora) => {
 
 export const formatearHora24 = (hora) => {
   if (!hora) return '';
-  if (/^([0-1][0-9]|2[0-3]):([0-5][0-9])$/.test(hora)) return hora;
-  try {
-    if (hora.includes(':')) {
-      const partes = hora.split(':');
-      if (partes.length >= 2) {
-        return `${partes[0].padStart(2, '0')}:${partes[1].padStart(2, '0').substring(0, 2)}`;
-      }
-    }
-  } catch (e) {
-    // silencio
+  // Si ya es HH:MM, devolver igual
+  if (/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(hora)) return hora;
+  // Si tiene segundos, quitar
+  if (/^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/.test(hora)) {
+    return hora.substring(0, 5);
   }
+  // Si es otro formato, intentar convertir
+  try {
+    const date = new Date(`1970-01-01T${hora}`);
+    if (!isNaN(date.getTime())) {
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+  } catch (e) {}
   return hora;
 };
 

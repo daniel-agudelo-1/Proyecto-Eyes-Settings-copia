@@ -1,4 +1,4 @@
-import { FormHelperText, MenuItem, TextField, Box } from "@mui/material";
+import { FormHelperText, MenuItem, TextField, Box, Button } from "@mui/material";
 import { TextFieldAlphanumeric } from "@shared/index";
 import { useMarcaForm } from "../hooks/useMarcaForm";
 
@@ -7,6 +7,7 @@ export default function MarcaForm({
   initialData,
   onSubmit,
   onCancel,
+  onEdit,               // función para abrir edición
   id,
   buttonRef
 }) {
@@ -66,6 +67,27 @@ export default function MarcaForm({
               <MenuItem value="true">Activa</MenuItem>
               <MenuItem value="false">Inactiva</MenuItem>
             </TextField>
+          </Box>
+        )}
+
+        {/* Botón Editar en modo vista, alineado a la derecha con el mismo estilo que el modal */}
+        {isView && onEdit && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+            <Button
+              variant="contained"
+              onClick={onEdit}
+              sx={{
+                backgroundColor: "#1a2540",
+                color: "#fff",
+                "&:hover": { backgroundColor: "#2d3a6b" },
+                textTransform: "none",
+                fontWeight: 500,
+                px: 2,
+                py: 0.75
+              }}
+            >
+              Editar
+            </Button>
           </Box>
         )}
       </Box>

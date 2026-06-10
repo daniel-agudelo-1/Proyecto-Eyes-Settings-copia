@@ -1,8 +1,28 @@
-import api from "../../../../lib/axios";
+import api from '@lib/axios';
 
 // ============================
 // FUNCIONES BASE
 // ============================
+
+// Obtener categorías con paginación, búsqueda y filtro de estado
+export async function getCategorias({ page = 1, per_page = 10, search = '', estado = '' } = {}) {
+  try {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('per_page', per_page);
+    if (search) params.append('search', search);
+    if (estado) params.append('estado', estado === 'activa' ? 'true' : 'false');
+
+    const response = await api.get(`/categorias?${params.toString()}`);
+    // El backend devuelve { data: [...], pagination: {...} }
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener categorías paginadas:', error);
+    throw error;
+  }
+}
+
+// Obtener todas las categorías (sin paginación) – se mantiene para compatibilidad
 export async function getAllCategorias() {
   try {
     const response = await api.get('/categorias');
@@ -117,6 +137,7 @@ export const getEstadoColor = (estado) => estado ? 'success' : 'error';
 // OBJETO AGRUPADO PARA COMPATIBILIDAD
 // ============================
 export const CategoriaData = {
+  getCategorias,
   getAllCategorias,
   getCategoriaById,
   createCategoria,

@@ -10,10 +10,8 @@ import {
 import { getEmpleadosAgenda } from '@servicios/agenda';
 import { getHorariosByEmpleado } from '@servicios/horario';
 import { getEstadosCita } from '../services/estadosCitaCampanaService';
-import { ESTADO_CITA } from '../utils/constants';
 import {
   formatearHora24,
-  horaA12,
   getBackendDay,
   generarSlotsHorarios,
 } from '../utils/campanasSaludUtils';
@@ -27,17 +25,9 @@ const INITIAL_FORM_DATA = {
   hora: '',
   direccion: '',
   observaciones: '',
-  estado_cita_id: ESTADO_CITA.PENDIENTE,
+  estado_cita_id: null,
 };
 
-/**
- * Hook para el formulario de campaña de salud (crear, editar, ver).
- * Maneja estado local del formulario, validaciones, carga de horarios disponibles,
- * y las mutaciones con React Query.
- *
- * @param {number|null} id - ID de la campaña (si es edición o vista)
- * @param {string} mode - 'create', 'edit', 'view'
- */
 export const useCampanaSaludForm = (id, mode = 'create') => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -54,13 +44,12 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
   const showNotification = (type, message) => setNotification({ open: true, type, message });
   const hideNotification = () => setNotification((prev) => ({ ...prev, open: false }));
 
-  // ---------- Consultas con React Query ----------
+  // ---------- Consultas ----------
   const { data: empleadosRaw = [] } = useQuery({
     queryKey: ['empleados-agenda'],
     queryFn: getEmpleadosAgenda,
     staleTime: 10 * 60 * 1000,
   });
-  // Filtrar solo empleados activos (asumimos campo 'activo' o 'estado')
   const empleados = empleadosRaw.filter(emp => emp.activo === true || emp.estado === true);
 
   const { data: estadosCita = [] } = useQuery({
@@ -69,6 +58,15 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Obtener ID del estado "Pendiente" (o usar 2 como fallback)
+  const estadoPendienteId = estadosCita.find(e => e.nombre?.toLowerCase() === 'pendiente')?.id || 2;
+
+  useEffect(() => {
+    if (estadoPendienteId && !formData.estado_cita_id && mode === 'create') {
+      setFormData(prev => ({ ...prev, estado_cita_id: estadoPendienteId }));
+    }
+  }, [estadoPendienteId, mode]);
+
   const { data: campanaData, isLoading: loadingCampana } = useQuery({
     queryKey: ['campana-salud', id],
     queryFn: () => getCampanaSaludById(id),
@@ -76,26 +74,25 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Cargar datos iniciales al obtener la campaña
   useEffect(() => {
     if (campanaData && (isEdit || isView)) {
       const loaded = {
         empleado_id: campanaData.empleado_id || '',
         empresa: campanaData.empresa || '',
-        nit_empresa: campanaData.nit_empresa || 'PENDIENTE',
+        nit_empresa: campanaData.nit_empresa || '',
         contacto: campanaData.contacto || '',
         fecha: campanaData.fecha ? campanaData.fecha.substring(0, 10) : '',
         hora: campanaData.hora ? formatearHora24(campanaData.hora) : '',
         direccion: campanaData.direccion || '',
         observaciones: campanaData.observaciones || '',
-        estado_cita_id: campanaData.estado_cita_id || ESTADO_CITA.PENDIENTE,
+        estado_cita_id: campanaData.estado_cita_id || estadoPendienteId,
       };
       setFormData(loaded);
       setOriginalData(loaded);
     }
-  }, [campanaData, isEdit, isView]);
+  }, [campanaData, isEdit, isView, estadoPendienteId]);
 
-  // ---------- Carga de horarios del empleado ----------
+  // ---------- Horarios ----------
   const loadHorariosEmpleado = useCallback(async (empleadoId) => {
     if (!empleadoId) {
       setHorariosEmpleado([]);
@@ -116,7 +113,6 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     }
   }, [formData.empleado_id, loadHorariosEmpleado]);
 
-  // Calcular horas disponibles según empleado y fecha
   useEffect(() => {
     if (!formData.empleado_id || !formData.fecha) {
       setHorasDisponibles([]);
@@ -136,7 +132,6 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     horariosDelDia.forEach((h) => {
       slots = slots.concat(generarSlotsHorarios(h.hora_inicio, h.hora_final));
     });
-    // Eliminar duplicados por valor
     const vistos = new Set();
     slots = slots.filter((s) => {
       if (vistos.has(s.value)) return false;
@@ -146,7 +141,6 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     slots.sort((a, b) => a.value.localeCompare(b.value));
     setHorasDisponibles(slots);
 
-    // Si la hora seleccionada ya no está disponible, limpiarla
     if (formData.hora && !slots.find((s) => s.value === formData.hora)) {
       setFormData((prev) => ({ ...prev, hora: '' }));
     }
@@ -163,26 +157,45 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     if (!formData.nit_empresa?.trim()) return 'El NIT de la empresa es requerido';
     if (formData.nit_empresa?.trim().length < 8) return 'El NIT debe tener al menos 8 dígitos';
     if (!formData.fecha) return 'La fecha es requerida';
+    // Validar formato de fecha YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.fecha)) return 'Formato de fecha inválido (use YYYY-MM-DD)';
     if (!formData.hora) return 'La hora es requerida';
+    // Validar formato de hora HH:MM
+    if (!/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(formData.hora)) return 'Formato de hora inválido (use HH:MM)';
     if (formData.contacto?.trim() && formData.contacto.trim().length !== 10) {
       return 'El teléfono de contacto debe tener exactamente 10 dígitos';
     }
     return null;
   };
 
-  const validarDuplicado = async () => {
+  const validarDuplicados = async () => {
     try {
       const todas = await getAllCampanasSalud();
       const empresaNorm = formData.empresa.trim().toLowerCase();
       const fecha = formData.fecha;
-      return (
-        todas.find((c) => {
-          const mismaEmpresa = c.empresa.trim().toLowerCase() === empresaNorm;
-          const mismaFecha = (c.fecha || '').substring(0, 10) === fecha;
+      const nitNorm = formData.nit_empresa.trim();
+
+      const duplicadoEmpresaFecha = todas.find((c) => {
+        const mismaEmpresa = c.empresa.trim().toLowerCase() === empresaNorm;
+        const mismaFecha = (c.fecha || '').substring(0, 10) === fecha;
+        const esOtro = isEdit ? c.id !== parseInt(id, 10) : true;
+        return mismaEmpresa && mismaFecha && esOtro;
+      });
+      if (duplicadoEmpresaFecha) {
+        return `Ya existe una campaña para "${duplicadoEmpresaFecha.empresa}" en la fecha ${formData.fecha}.`;
+      }
+
+      if (nitNorm && (!isEdit || nitNorm !== originalData?.nit_empresa)) {
+        const duplicadoNit = todas.find((c) => {
+          const mismoNit = (c.nit_empresa || '').trim() === nitNorm;
           const esOtro = isEdit ? c.id !== parseInt(id, 10) : true;
-          return mismaEmpresa && mismaFecha && esOtro;
-        }) || null
-      );
+          return mismoNit && esOtro;
+        });
+        if (duplicadoNit) {
+          return `El NIT "${nitNorm}" ya está registrado en otra campaña.`;
+        }
+      }
+      return null;
     } catch {
       return null;
     }
@@ -196,17 +209,17 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
     if (formData.empresa !== originalData.empresa)
       changed.empresa = formData.empresa.trim();
     if (formData.nit_empresa !== originalData.nit_empresa)
-      changed.nit_empresa = formData.nit_empresa?.trim() || originalData.nit_empresa || 'PENDIENTE';
+      changed.nit_empresa = formData.nit_empresa.trim();
     if (formData.contacto !== originalData.contacto)
-      changed.contacto = formData.contacto?.trim() || null;
+      changed.contacto = formData.contacto.trim() || null;
     if (formData.fecha !== originalData.fecha)
       changed.fecha = formData.fecha;
     if (formData.hora !== originalData.hora)
-      changed.hora = formatearHora24(formData.hora);
+      changed.hora = formData.hora;
     if (formData.direccion !== originalData.direccion)
-      changed.direccion = formData.direccion?.trim() || null;
+      changed.direccion = formData.direccion.trim() || null;
     if (formData.observaciones !== originalData.observaciones)
-      changed.observaciones = formData.observaciones?.trim() || null;
+      changed.observaciones = formData.observaciones.trim() || null;
     if (formData.estado_cita_id !== originalData.estado_cita_id)
       changed.estado_cita_id = parseInt(formData.estado_cita_id, 10);
     return changed;
@@ -251,10 +264,10 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
       return;
     }
 
-    const duplicado = await validarDuplicado();
-    if (duplicado) {
-      const msg = `Ya existe una campaña para "${duplicado.empresa}" en la fecha ${formData.fecha}. No se pueden registrar dos campañas para la misma empresa en el mismo día.`;
-      showNotification('error', msg);
+    // Validar duplicados (empresa+fecha y NIT)
+    const errorDuplicado = await validarDuplicados();
+    if (errorDuplicado) {
+      showNotification('error', errorDuplicado);
       return;
     }
 
@@ -264,16 +277,17 @@ export const useCampanaSaludForm = (id, mode = 'create') => {
         showNotification('info', 'No hay cambios para guardar');
         return;
       }
+      // Asegurar formato de hora en los cambios
+      if (changedFields.hora) changedFields.hora = changedFields.hora.substring(0, 5);
       updateMutation.mutate({ id: parseInt(id, 10), data: changedFields });
     } else {
-      const horaFormateada = formatearHora24(formData.hora);
       const dataToSubmit = {
         empleado_id: parseInt(formData.empleado_id, 10),
         empresa: formData.empresa.trim(),
-        nit_empresa: formData.nit_empresa.trim() || 'PENDIENTE',
+        nit_empresa: formData.nit_empresa.trim(),
         fecha: formData.fecha,
-        hora: horaFormateada,
-        estado_cita_id: ESTADO_CITA.PENDIENTE,
+        hora: formData.hora.substring(0, 5), // garantizar HH:MM
+        estado_cita_id: estadoPendienteId,
       };
       if (formData.contacto?.trim()) dataToSubmit.contacto = formData.contacto.trim();
       if (formData.direccion?.trim()) dataToSubmit.direccion = formData.direccion.trim();

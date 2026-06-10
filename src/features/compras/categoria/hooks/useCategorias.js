@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  getAllCategorias,
+  getCategorias,
   deleteCategoria,
   toggleCategoriaEstado,
   hasCategoriaProductosAsociados,
@@ -11,6 +11,7 @@ export function useCategorias() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
+  const [page, setPage] = useState(1);
   const [modalForm, setModalForm] = useState({
     open: false,
     mode: "create",
@@ -23,35 +24,39 @@ export function useCategorias() {
     nombre: "",
   });
 
+  // Mapeo de filtro estado a valor esperado por el backend
+  const estadoParam = filterEstado === "activa" ? "true" : filterEstado === "inactiva" ? "false" : "";
+
   const {
-    data: categoriasRaw = [],
+    data: responseData,
     isLoading,
     isError,
+    refetch,
   } = useQuery({
-    queryKey: ["categorias"],
-    queryFn: getAllCategorias,
+    queryKey: ["categorias", page, search, estadoParam],
+    queryFn: () => getCategorias({ page, per_page: 10, search, estado: estadoParam }),
+    keepPreviousData: true,
     staleTime: 1000 * 60,
-    retry: 1,
   });
 
-  const categorias = useMemo(
-    () =>
-      (Array.isArray(categoriasRaw) ? categoriasRaw : []).map((categoria) => ({
-        id: categoria.id,
-        nombre: categoria.nombre,
-        descripcion: categoria.descripcion || "",
-        estado: categoria.estado ? "activa" : "inactiva",
-      })),
-    [categoriasRaw]
-  );
+  const categoriasRaw = responseData?.data || [];
+  const pagination = responseData?.pagination || { total_pages: 1, current_page: 1 };
+
+  // Normalizar datos para la tabla
+  const categorias = categoriasRaw.map((categoria) => ({
+    id: categoria.id,
+    nombre: categoria.nombre,
+    descripcion: categoria.descripcion || "",
+    estado: categoria.estado ? "activa" : "inactiva",
+  }));
 
   const loading = isLoading;
   const error = isError ? "No se pudieron cargar las categorías" : null;
+  const totalPages = pagination.total_pages;
 
-  const loadCategorias = useCallback(
-    () => queryClient.invalidateQueries(["categorias"]),
-    [queryClient]
-  );
+  const loadCategorias = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   const eliminarCategoria = useCallback(
     async (id, nombre) => {
@@ -92,15 +97,16 @@ export function useCategorias() {
     [loadCategorias]
   );
 
-  const categoriasFiltradas = categorias.filter((categoria) => {
-    const matchesSearch =
-      categoria.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      (categoria.descripcion && categoria.descripcion.toLowerCase().includes(search.toLowerCase()));
+  // Reiniciar a página 1 cuando cambian búsqueda o filtro
+  const handleSetSearch = useCallback((value) => {
+    setSearch(value);
+    setPage(1);
+  }, []);
 
-    const matchesFilter = !filterEstado || categoria.estado === filterEstado;
-
-    return matchesSearch && matchesFilter;
-  });
+  const handleSetFilterEstado = useCallback((value) => {
+    setFilterEstado(value);
+    setPage(1);
+  }, []);
 
   const openCreateModal = useCallback(() => {
     setModalForm({
@@ -155,14 +161,16 @@ export function useCategorias() {
   }, []);
 
   return {
-    categorias: categoriasFiltradas,
-    categoriasRaw: categorias,
+    categorias,
     loading,
     error,
     search,
-    setSearch,
+    setSearch: handleSetSearch,
     filterEstado,
-    setFilterEstado,
+    setFilterEstado: handleSetFilterEstado,
+    page,
+    setPage,
+    totalPages,
     loadCategorias,
     eliminarCategoria,
     cambiarEstado,

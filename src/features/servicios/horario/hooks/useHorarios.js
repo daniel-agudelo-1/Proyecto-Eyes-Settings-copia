@@ -1,56 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAllHorarios, createHorario, updateHorario, deleteHorario, updateEstadoHorario } from '../services/horariosService';
-import { getEmpleadosAgenda } from '@servicios/agenda'; 
+import { getEmpleadosAgenda } from '@servicios/agenda';
 import { normalizeHorariosForList } from '../utils/horariosUtils';
+
+const PAGE_SIZE = 10; // elementos por página
 
 export function useHorarios() {
   const queryClient = useQueryClient();
 
-  // Empleados (caché compartido con agenda)
-  const { data: empleados = [] } = useQuery({
-    queryKey: ['empleados-agenda'],
-    queryFn: getEmpleadosAgenda,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // Horarios
-  const {
-    data: horariosRaw = [],
-    isLoading: loadingHorarios,
-    error: horariosError,
-  } = useQuery({
-    queryKey: ['horarios'],
-    queryFn: getAllHorarios,
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const horariosNormalizados = normalizeHorariosForList(horariosRaw, empleados);
-
-  // Mutaciones
-  const createMutation = useMutation({
-    mutationFn: createHorario,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => updateHorario(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteHorario,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
-  });
-
-  const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, activo }) => updateEstadoHorario(id, activo),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
-  });
-
   // Estados de UI
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState('');
+  const [filterEstado, setFilterEstado] = useState(''); // '', 'activo', 'inactivo'
   const [modalForm, setModalForm] = useState({
     open: false,
     mode: 'create',
@@ -63,37 +25,105 @@ export function useHorarios() {
     descripcion: '',
   });
 
-  // Filtrado
-  const horariosFiltrados = horariosNormalizados.filter((horario) => {
-    const matchesSearch =
-      horario.empleado_nombre?.toLowerCase().includes(search.toLowerCase()) ||
-      horario.dia_nombre?.toLowerCase().includes(search.toLowerCase()) ||
-      horario.hora_inicio?.includes(search) ||
-      horario.hora_final?.includes(search);
-    const matchesEstado = !filterEstado || horario.estado === filterEstado;
-    return matchesSearch && matchesEstado;
+  // Carga de empleados
+  const { data: empleados = [] } = useQuery({
+    queryKey: ['empleados-agenda'],
+    queryFn: getEmpleadosAgenda,
+    staleTime: 10 * 60 * 1000,
   });
 
-  // Wrappers de mutaciones
+  // Carga de todos los horarios (sin paginación desde el backend)
+  const {
+    data: horariosRaw = [],
+    isLoading: loadingHorarios,
+    error: horariosError,
+    refetch,
+  } = useQuery({
+    queryKey: ['horarios'],
+    queryFn: getAllHorarios,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Normalización completa
+  const horariosNormalizados = useMemo(() => {
+    return normalizeHorariosForList(horariosRaw, empleados);
+  }, [horariosRaw, empleados]);
+
+  // Filtrado local
+  const horariosFiltrados = useMemo(() => {
+    let filtered = horariosNormalizados;
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      filtered = filtered.filter(h =>
+        h.empleado_nombre?.toLowerCase().includes(lowerSearch) ||
+        h.dia_nombre?.toLowerCase().includes(lowerSearch) ||
+        h.hora_inicio?.includes(search) ||
+        h.hora_final?.includes(search)
+      );
+    }
+    if (filterEstado) {
+      filtered = filtered.filter(h => h.estado === filterEstado);
+    }
+    return filtered;
+  }, [horariosNormalizados, search, filterEstado]);
+
+  // Paginación local
+  const totalItems = horariosFiltrados.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paginatedHorarios = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return horariosFiltrados.slice(start, end);
+  }, [horariosFiltrados, page]);
+
+  // Mutaciones (invalidan la caché)
+  const createMutation = useMutation({
+    mutationFn: createHorario,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['horarios'] });
+      // Si agregamos un horario y estamos en la última página, nos aseguramos de verlo
+      if (paginatedHorarios.length === PAGE_SIZE && totalItems % PAGE_SIZE === 0) {
+        setPage(totalPages + 1);
+      }
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => updateHorario(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteHorario,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['horarios'] });
+      if (paginatedHorarios.length === 1 && page > 1) {
+        setPage(page - 1);
+      }
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, activo }) => updateEstadoHorario(id, activo),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['horarios'] }),
+  });
+
+  // Wrappers
   const eliminarHorario = useCallback(async (id) => {
-    const result = await deleteMutation.mutateAsync(id);
-    return result;
+    return await deleteMutation.mutateAsync(id);
   }, [deleteMutation]);
 
   const cambiarEstado = useCallback(async (row, nuevoEstado) => {
     const activo = nuevoEstado === 'activo';
-    const result = await toggleStatusMutation.mutateAsync({ id: row.id, activo });
-    return result;
+    return await toggleStatusMutation.mutateAsync({ id: row.id, activo });
   }, [toggleStatusMutation]);
 
   const crearHorario = useCallback(async (data) => {
-    const result = await createMutation.mutateAsync(data);
-    return result;
+    return await createMutation.mutateAsync(data);
   }, [createMutation]);
 
   const editarHorario = useCallback(async (id, data) => {
-    const result = await updateMutation.mutateAsync({ id, data });
-    return result;
+    return await updateMutation.mutateAsync({ id, data });
   }, [updateMutation]);
 
   // Handlers de modales
@@ -156,25 +186,33 @@ export function useHorarios() {
   ];
 
   const recargar = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['horarios'] });
-  }, [queryClient]);
+    refetch();
+  }, [refetch]);
 
   return {
-    horarios: horariosFiltrados,
+    horarios: paginatedHorarios,
     horariosRaw: horariosNormalizados,
     empleados,
     loading: loadingHorarios,
     error: horariosError,
+    // Paginación
+    page,
+    setPage,
+    perPage: PAGE_SIZE,
+    totalPages,
+    // Filtros
     search,
     setSearch,
     filterEstado,
     setFilterEstado,
     estadoFilters,
+    // Acciones
     eliminarHorario,
     cambiarEstado,
     crearHorario,
     editarHorario,
     recargar,
+    // Modales
     modalForm,
     modalDelete,
     openCreateModal,

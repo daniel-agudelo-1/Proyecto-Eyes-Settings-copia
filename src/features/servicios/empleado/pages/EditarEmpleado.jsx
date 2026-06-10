@@ -21,6 +21,12 @@ export default function EditarEmpleado() {
     setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 5000);
   };
 
+  const empleadoId = parseInt(id, 10);
+  if (isNaN(empleadoId)) {
+    navigate("/admin/servicios/empleados");
+    return null;
+  }
+
   const {
     formData,
     errors,
@@ -46,7 +52,7 @@ export default function EditarEmpleado() {
       try {
         setLoading(true);
         setError(null);
-        const data = await getEmpleadoById(Number(id));
+        const data = await getEmpleadoById(empleadoId);
         if (!data) {
           navigate("/admin/servicios/empleados");
           return;
@@ -62,7 +68,7 @@ export default function EditarEmpleado() {
       }
     };
     cargarEmpleado();
-  }, [id, navigate, setFormData]);
+  }, [empleadoId, navigate, setFormData]);
 
   if (loading) return <Loading text="Cargando información del empleado..." />;
   if (error) {

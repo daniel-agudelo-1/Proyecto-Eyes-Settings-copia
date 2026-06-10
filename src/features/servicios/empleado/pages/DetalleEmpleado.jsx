@@ -14,12 +14,18 @@ export default function DetalleEmpleado() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const empleadoId = parseInt(id, 10);
+  if (isNaN(empleadoId)) {
+    navigate("/admin/servicios/empleados");
+    return null;
+  }
+
   useEffect(() => {
     const cargarEmpleado = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await getEmpleadoById(Number(id));
+        const data = await getEmpleadoById(empleadoId);
         if (!data) {
           navigate("/admin/servicios/empleados");
           return;
@@ -34,7 +40,7 @@ export default function DetalleEmpleado() {
       }
     };
     cargarEmpleado();
-  }, [id, navigate]);
+  }, [empleadoId, navigate]);
 
   // Handlers dummy para modo vista
   const handleChange = () => {};
@@ -62,9 +68,9 @@ export default function DetalleEmpleado() {
   return (
     <EmpleadoForm
       mode="view"
-      title={`Detalle del Empleado: ${empleado.nombre}`}
+      title={`Detalle del Empleado: ${empleado.nombre} ${empleado.apellido}`}
       onCancel={() => navigate("/admin/servicios/empleados")}
-      onEdit={() => navigate(`/admin/servicios/empleados/editar/${empleado.id}`)}
+      onEdit={() => navigate(`/admin/servicios/empleados/editar/${empleadoId}`)}
       formData={empleado}
       errors={errors}
       submitting={submitting}

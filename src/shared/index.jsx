@@ -17,6 +17,7 @@ export { default as TextFieldNoEmoji } from './components/base/TextFieldNoEmoji'
 export { default as CrudForm }         from './components/crud/CrudForm';
 export { default as CrudTable }        from './components/crud/CrudTable';
 export { default as CrudLayout }       from './components/crud/CrudLayout';
+export { default as CrudPagination }   from './components/crud/CrudPagination';
 
 // UI
 export { default as Loading }          from './components/ui/Loading';
