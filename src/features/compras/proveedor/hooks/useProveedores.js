@@ -3,6 +3,8 @@ import { getAllProveedores, deleteProveedor, toggleEstadoProveedor } from "../se
 import { normalizeProveedorForForm } from "../utils/proveedoresUtils";
 
 export function useProveedores({ onSuccess } = {}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [proveedores, setProveedores] = useState([]);
   const [search, setSearch] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
@@ -12,6 +14,11 @@ export function useProveedores({ onSuccess } = {}) {
     id: null,
     razonSocial: "",
   });
+
+  // Cargar proveedores al montar
+  useEffect(() => {
+    cargarProveedores();
+  }, []);
 
   const cargarProveedores = useCallback(async () => {
     try {
@@ -50,36 +57,31 @@ export function useProveedores({ onSuccess } = {}) {
     }
   }, [cargarProveedores, onSuccess, modalDelete.razonSocial]);
 
-  // Cambiar estado optimista — pasa row completo al servicio para evitar GET extra
   const cambiarEstado = useCallback((row, nuevoEstado) => {
     const estadoAnterior = row.estado;
     const nuevoEstadoBool = nuevoEstado === "activo";
 
-    // 1. Actualizar localmente de inmediato
     setProveedores((prev) =>
       prev.map((p) => p.id === row.id ? { ...p, estado: nuevoEstado } : p)
     );
 
-    // 2. PUT al backend con datos completos del row (sin GET adicional)
     toggleEstadoProveedor(row.id, nuevoEstadoBool, row)
       .then(() => {
         onSuccess?.(`Estado de "${row.razonSocial}" cambiado a ${nuevoEstado}`, "success");
       })
       .catch((err) => {
         console.error("Error al cambiar estado:", err);
-        // 3. Revertir
         setProveedores((prev) =>
           prev.map((p) => p.id === row.id ? { ...p, estado: estadoAnterior } : p)
         );
-        // Mostrar razón del backend si es un mensaje de negocio (no error técnico)
         const data = err.response?.data;
-        console.warn("BACKEND DATA COMPLETO:", JSON.stringify(data));
-        const mensaje = data?.message || data?.error || data?.detail || data?.msg || (typeof data === "string" ? data : "");
+        const mensaje = data?.message || data?.error || data?.detail || data?.msg || "";
         const esMensajeNegocio = mensaje && typeof mensaje === "string" && mensaje.length < 200;
         onSuccess?.(esMensajeNegocio ? mensaje : "No se pudo cambiar el estado", "error");
       });
   }, [onSuccess]);
 
+  // Filtros y paginación
   const proveedoresFiltrados = proveedores.filter((proveedor) => {
     const matchesSearch =
       (proveedor.razonSocial || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -88,6 +90,13 @@ export function useProveedores({ onSuccess } = {}) {
     const matchesEstado = !filterEstado || proveedor.estado === filterEstado;
     return matchesSearch && matchesEstado;
   });
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(proveedoresFiltrados.length / itemsPerPage);
+  const paginatedProveedores = proveedoresFiltrados.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
+  );
 
   const estadoFilters = [
     { value: "",         label: "Todos"    },
@@ -103,7 +112,6 @@ export function useProveedores({ onSuccess } = {}) {
     setModalDelete({ open: false, id: null, razonSocial: "" });
   }, []);
 
-  // Reiniciar página al cambiar búsqueda o filtro
   const handleSetSearch = useCallback((value) => {
     setSearch(value);
     setPage(1);
@@ -115,7 +123,8 @@ export function useProveedores({ onSuccess } = {}) {
   }, []);
 
   return {
-    proveedores,
+    proveedores: paginatedProveedores,
+    allProveedores: proveedoresFiltrados,
     loading,
     error,
     search,

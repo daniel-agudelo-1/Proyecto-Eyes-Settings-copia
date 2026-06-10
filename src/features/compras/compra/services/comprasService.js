@@ -1,26 +1,52 @@
 import api from '@lib/axios';
 import { getAllProveedores } from '../../proveedor/services/proveedoresService';
 
-// ── Helper: extrae array de cualquier forma que devuelva el backend ────────────
-function extractArray(data, keys = ['compras', 'data', 'items', 'results']) {
-  if (Array.isArray(data)) return data;
-  for (const key of keys) {
-    if (Array.isArray(data?.[key])) return data[key];
+// ── Obtener compras con paginación y filtros ─────────────────────────────────
+export async function getCompras({ page = 1, per_page = 10, search = '', estado_compra = null } = {}) {
+  try {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('per_page', per_page);
+    if (search) params.append('search', search);
+    // El backend espera "true" o "false" como string
+    if (estado_compra !== null) {
+      params.append('estado_compra', estado_compra ? 'true' : 'false');
+    }
+
+    const comprasRes = await api.get(`/compras?${params.toString()}`);
+    const comprasData = comprasRes.data;
+
+    // Obtener proveedores para mapear nombres
+    const proveedoresRes = await getAllProveedores();
+    const proveedoresMap = {};
+    (proveedoresRes || []).forEach((p) => {
+      proveedoresMap[p.id] = p.razon_social_o_nombre || p.razonSocial || p.nombre || '';
+    });
+
+    let comprasList = [];
+    let pagination = { current_page: 1, total_pages: 1, total: 0, has_next: false, has_prev: false };
+
+    if (comprasData && typeof comprasData === 'object' && 'data' in comprasData) {
+      comprasList = comprasData.data.map((c) => ({
+        ...c,
+        proveedor_nombre: proveedoresMap[c.proveedor_id] || 'Proveedor no encontrado',
+      }));
+      pagination = comprasData.pagination;
+    } else if (Array.isArray(comprasData)) {
+      comprasList = comprasData.map((c) => ({
+        ...c,
+        proveedor_nombre: proveedoresMap[c.proveedor_id] || 'Proveedor no encontrado',
+      }));
+    }
+
+    return { data: comprasList, pagination };
+  } catch (error) {
+    console.error('Error en getCompras:', error);
+    throw error;
   }
-  return [];
 }
 
-// ── Helper: construye mapa id→nombre de proveedores ───────────────────────────
-function buildProveedoresMap(proveedoresRes) {
-  const list = extractArray(proveedoresRes);
-  const map = {};
-  list.forEach((p) => {
-    map[p.id] = p.razon_social_o_nombre || p.razonSocial || p.nombre || '';
-  });
-  return map;
-}
-
-// ── Obtener todas las compras ─────────────────────────────────────────────────
+// ── Mantener getAllCompras para compatibilidad (si se usa en otro sitio) ──────
 export async function getAllCompras() {
   try {
     const [comprasRes, proveedoresRes] = await Promise.all([
@@ -28,9 +54,13 @@ export async function getAllCompras() {
       getAllProveedores(),
     ]);
 
-    const proveedoresMap = buildProveedoresMap(proveedoresRes);
-    const rawCompras = extractArray(comprasRes.data);
+    const proveedoresMap = {};
+    (proveedoresRes || []).forEach((p) => {
+      proveedoresMap[p.id] = p.razon_social_o_nombre || p.razonSocial || p.nombre || '';
+    });
 
+    // Asumimos que /compras sin paginación devuelve array directamente
+    const rawCompras = Array.isArray(comprasRes.data) ? comprasRes.data : (comprasRes.data?.data || []);
     return rawCompras.map((compra) => ({
       ...compra,
       proveedor_nombre: proveedoresMap[compra.proveedor_id] || 'Proveedor no encontrado',
@@ -41,10 +71,6 @@ export async function getAllCompras() {
   }
 }
 
-// ── EXPORTACIÓN PRINCIPAL PARA useCompras.js ──────────────────────────────────
-// 👇 Esta es la línea que faltaba
-export const getCompras = getAllCompras;
-
 // ── Obtener compra por ID con detalles ────────────────────────────────────────
 export async function getCompraById(id) {
   try {
@@ -54,9 +80,13 @@ export async function getCompraById(id) {
       api.get(`/compras/${id}/detalles`).catch(() => ({ data: [] })),
     ]);
 
-    const compra = compraRes.data?.compra ?? compraRes.data?.data ?? compraRes.data;
-    const detalles = extractArray(detallesRes.data, ['detalles', 'items', 'productos', 'data']);
-    const proveedoresMap = buildProveedoresMap(proveedoresRes);
+    const compra = compraRes.data;
+    const detalles = Array.isArray(detallesRes.data) ? detallesRes.data : [];
+
+    const proveedoresMap = {};
+    (proveedoresRes || []).forEach((p) => {
+      proveedoresMap[p.id] = p.razon_social_o_nombre || p.razonSocial || p.nombre || '';
+    });
 
     return {
       ...compra,
@@ -149,7 +179,7 @@ export async function anularCompra(id) {
   }
 }
 
-// ── Crear proveedor (si se necesita) ──────────────────────────────────────────
+// ── Crear proveedor ───────────────────────────────────────────────────────────
 export async function createProveedor(data) {
   try {
     const res = await api.post('/proveedores', {

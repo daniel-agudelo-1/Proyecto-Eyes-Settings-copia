@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import CrudPagination from "../../../../shared/components/crud/CrudPagination";
 import CrudLayout from "../../../../shared/components/crud/CrudLayout";
 import CrudTable from "../../../../shared/components/crud/CrudTable";
 import Modal from "../../../../shared/components/ui/Modal";
