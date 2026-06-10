@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ProveedorForm from "../components/ProveedorForm";
-import CrudNotification from "@shared/styles/components/notifications/CrudNotification";
+import CrudNotification from "../../../../shared/styles/components/notifications/CrudNotification";
 
 export default function CrearProveedor() {
   const navigate = useNavigate();
-  const [notification, setNotification] = useState({ isVisible: false, message: "", type: "success" });
+  const [notification, setNotification] = useState({
+    message: "", type: "success", isVisible: false,
+  });
 
-  const showNotification = (message, type = "success") => {
-    setNotification({ isVisible: true, message, type });
-    setTimeout(() => {
-      if (type === "success") navigate("/admin/compras/proveedores");
-    }, 1500);
-  };
+  const showNotification = useCallback((message, type = "success") => {
+    setNotification({ message, type, isVisible: true });
+  }, []);
+
+  const hideNotification = useCallback(() => {
+    setNotification((prev) => ({ ...prev, isVisible: false }));
+  }, []);
 
   return (
     <>
@@ -20,14 +23,16 @@ export default function CrearProveedor() {
         message={notification.message}
         type={notification.type}
         isVisible={notification.isVisible}
-        onClose={() => setNotification((prev) => ({ ...prev, isVisible: false }))}
+        onClose={hideNotification}
       />
       <ProveedorForm
         mode="create"
         title="Crear Nuevo Proveedor"
+        onSubmit={() => {
+          showNotification("Proveedor creado exitosamente", "success");
+          setTimeout(() => navigate("/admin/compras/proveedores"), 1000);
+        }}
         onCancel={() => navigate("/admin/compras/proveedores")}
-        onSubmit={() => showNotification("Proveedor creado exitosamente", "success")}
-        onError={(msg) => showNotification(msg, "error")}
       />
     </>
   );

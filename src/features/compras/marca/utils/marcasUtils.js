@@ -45,7 +45,8 @@ export const normalizeMarcaForForm = (marca) => ({
 export const normalizeMarcaForList = (marca) => ({
   id: marca.id,
   nombre: marca.nombre,
-  estado: marca.estado ? 'activa' : 'inactiva'
+  estado: marca.estado ? 'activa' : 'inactiva',
+  estadosDisponibles: ['activa', 'inactiva'] 
 });
 
 // ============================

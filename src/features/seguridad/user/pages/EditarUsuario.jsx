@@ -84,7 +84,7 @@ export default function EditarUsuario() {
         })
       );
       navigate("/admin/seguridad/usuarios");
-      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsuarios"] });
       queryClient.invalidateQueries({ queryKey: ["usuario", id] });
     },
     onError: (error) => {

@@ -45,7 +45,7 @@ export default function CrearUsuario() {
   const createMutation = useMutation({
     mutationFn: createUser,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["allUsuarios"] });
       sessionStorage.setItem(
         "crudNotification",
         JSON.stringify({ message: `Usuario "${formData.nombre}" creado correctamente`, type: "success" })

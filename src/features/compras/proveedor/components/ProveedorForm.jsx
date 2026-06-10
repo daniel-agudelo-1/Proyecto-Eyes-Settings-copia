@@ -1,12 +1,15 @@
-import BaseFormLayout from "@shared/components/base/BaseFormLayout";
-import BaseFormSection from "@shared/components/base/BaseFormSection";
-import BaseFormField from "@shared/components/base/BaseFormField";
-import BaseFormActions from "@shared/components/base/BaseFormActions";
-import BaseInputField from "@shared/components/base/BaseInputField";
+import { useState, useEffect } from "react";
+import BaseFormLayout from "../../../../shared/components/base/BaseFormLayout";
+import BaseFormSection from "../../../../shared/components/base/BaseFormSection";
+import BaseFormField from "../../../../shared/components/base/BaseFormField";
+import BaseFormActions from "../../../../shared/components/base/BaseFormActions";
+import BaseInputField from "../../../../shared/components/base/BaseInputField";
 import {
   tipoProveedorOptions,
   tipoDocumentoOptions,
   estadoOptions,
+  fetchDepartamentos,
+  fetchMunicipios,
 } from "../utils/proveedoresUtils";
 import { useProveedorForm } from "../hooks/useProveedorForm";
 
@@ -16,14 +19,20 @@ export default function ProveedorForm({
   initialData = null,
   onSubmit,
   onCancel,
-  onEdit,
+  onError,
+  extraActions = null,
 }) {
-  const isView = mode === "view";
+  const [departamentos,     setDepartamentos]     = useState([]);
+  const [municipios,        setMunicipios]        = useState([]);
+  const [loadingDepto,      setLoadingDepto]      = useState(false);
+  const [loadingMunicipio,  setLoadingMunicipio]  = useState(false);
 
   const {
     formData,
     errors,
     submitting,
+    isView,
+    isCreate,
     handleChange,
     handleDocumentChange,
     handlePhoneChange,
@@ -32,7 +41,7 @@ export default function ProveedorForm({
     mode,
     initialData,
     onSubmitSuccess: onSubmit,
-    onError: (error) => console.error(error),
+    onError: onError ?? ((error) => console.error(error)),
   });
 
   const onSubmitForm = async () => {
@@ -44,10 +53,41 @@ export default function ProveedorForm({
 
   const isDisabled = isView || submitting;
 
+  // ============================
+  // Cargar departamentos al montar
+  // ============================
+  useEffect(() => {
+    setLoadingDepto(true);
+    fetchDepartamentos()
+      .then(setDepartamentos)
+      .catch(() => setDepartamentos([]))
+      .finally(() => setLoadingDepto(false));
+  }, []);
+
+  // ============================
+  // Cargar municipios cuando cambia departamento
+  // ============================
+  useEffect(() => {
+    if (!formData.departamento) {
+      setMunicipios([]);
+      return;
+    }
+    // Buscar el id del departamento seleccionado
+    const depto = departamentos.find((d) => d.value === formData.departamento);
+    if (!depto) return;
+
+    setLoadingMunicipio(true);
+    fetchMunicipios(depto.id)
+      .then(setMunicipios)
+      .catch(() => setMunicipios([]))
+      .finally(() => setLoadingMunicipio(false));
+  }, [formData.departamento, departamentos]);
+
   return (
     <BaseFormLayout title={title}>
       <BaseFormSection title="Información del Proveedor">
 
+        {/* Tipo de Proveedor */}
         <BaseFormField>
           <BaseInputField
             label="Tipo de Proveedor"
@@ -60,6 +100,7 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Razón Social / Nombre */}
         <BaseFormField>
           <BaseInputField
             label={formData.tipoProveedor === "Persona Jurídica" ? "Razón Social" : "Nombre Completo"}
@@ -73,6 +114,7 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Tipo de Documento */}
         <BaseFormField>
           <BaseInputField
             label="Tipo de Documento"
@@ -85,6 +127,7 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Número de Documento */}
         <BaseFormField>
           <BaseInputField
             label="Número de Documento"
@@ -98,6 +141,7 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Persona de Contacto */}
         <BaseFormField>
           <BaseInputField
             label="Persona de Contacto"
@@ -111,6 +155,7 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Teléfono */}
         <BaseFormField>
           <BaseInputField
             label="Teléfono"
@@ -124,6 +169,7 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Correo Electrónico */}
         <BaseFormField>
           <BaseInputField
             label="Correo Electrónico"
@@ -137,32 +183,42 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
+        {/* Departamento */}
         <BaseFormField>
           <BaseInputField
-            label="Departamento"
+            label={loadingDepto ? "Cargando departamentos..." : "Departamento"}
             name="departamento"
             value={formData.departamento}
             onChange={handleChange}
-            disabled={isDisabled}
+            select
+            options={departamentos}
+            disabled={isDisabled || loadingDepto}
             required
             error={!!errors.departamento}
             helperText={errors.departamento}
           />
         </BaseFormField>
 
+        {/* Municipio — encadenado al departamento */}
         <BaseFormField>
           <BaseInputField
-            label="Municipio"
+            label={loadingMunicipio ? "Cargando municipios..." : "Municipio"}
             name="municipio"
             value={formData.municipio}
             onChange={handleChange}
-            disabled={isDisabled}
+            select
+            options={municipios}
+            disabled={isDisabled || loadingMunicipio || (!isView && !formData.departamento)}
             required
             error={!!errors.municipio}
-            helperText={errors.municipio}
+            helperText={
+              errors.municipio ||
+              (!formData.departamento && !isView ? "Seleccione primero un departamento" : "")
+            }
           />
         </BaseFormField>
 
+        {/* Dirección */}
         <BaseFormField>
           <BaseInputField
             label="Dirección"
@@ -176,7 +232,8 @@ export default function ProveedorForm({
           />
         </BaseFormField>
 
-        {mode !== "create" && (
+        {/* Estado — solo en editar y ver detalle, nunca en crear */}
+        {!isCreate && (
           <BaseFormField>
             <BaseInputField
               label="Estado"
@@ -192,15 +249,26 @@ export default function ProveedorForm({
 
       </BaseFormSection>
 
-      <BaseFormActions
-        onCancel={onCancel}
-        onSave={onSubmitForm}
-        onEdit={onEdit}
-        showSave={mode !== "view"}
-        showEdit={mode === "view"}
-        saveLabel={submitting ? "Guardando..." : "Guardar"}
-        saveDisabled={submitting}
-      />
+      {/* Botones vista */}
+      {isView && (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
+          {extraActions}
+          <button className="crud-btn crud-btn-secondary" onClick={onCancel}>
+            Volver
+          </button>
+        </div>
+      )}
+
+      {/* Botones crear/editar */}
+      {!isView && (
+        <BaseFormActions
+          onCancel={onCancel}
+          onSave={onSubmitForm}
+          showSave
+          saveLabel={submitting ? "Guardando..." : isCreate ? "Crear Proveedor" : "Guardar Cambios"}
+          saveDisabled={submitting}
+        />
+      )}
     </BaseFormLayout>
   );
 }

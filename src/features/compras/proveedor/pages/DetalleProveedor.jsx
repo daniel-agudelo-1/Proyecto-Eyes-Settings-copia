@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { getProveedorById } from "../services/proveedoresService";
 import { normalizeProveedorForForm } from "../utils/proveedoresUtils";
 import ProveedorForm from "../components/ProveedorForm";
-import Loading from "@shared/components/ui/Loading";
+import Loading from "../../../../shared/components/ui/Loading";
 
 export default function DetalleProveedor() {
   const navigate = useNavigate();
@@ -21,7 +21,7 @@ export default function DetalleProveedor() {
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
-  if (loading) return <Loading text="Cargando proveedor..." />;
+  if (loading) return <Loading message="Cargando proveedor..." />;
   if (!proveedor) return null;
 
   return (
@@ -30,7 +30,14 @@ export default function DetalleProveedor() {
       title={`Detalle del Proveedor: ${proveedor.razonSocial}`}
       initialData={proveedor}
       onCancel={() => navigate("/admin/compras/proveedores")}
-      onEdit={() => navigate(`/admin/compras/proveedores/editar/${proveedor.id}`)}
+      extraActions={
+        <button
+          className="crud-btn crud-btn-primary"
+          onClick={() => navigate(`/admin/compras/proveedores/editar/${proveedor.id}`)}
+        >
+          Editar
+        </button>
+      }
     />
   );
 }

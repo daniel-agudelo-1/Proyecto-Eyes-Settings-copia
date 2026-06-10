@@ -1,4 +1,4 @@
-import api from "@lib/axios";
+import api from "../../../../lib/axios";
 
 // Obtener proveedores paginados (para la tabla)
 export async function getProveedores({ page = 1, per_page = 10, search = '', estado = '' } = {}) {
@@ -38,62 +38,44 @@ export async function getProveedorById(id) {
   }
 }
 
-export async function createProveedor(data) {
-  const payload = {
-    tipo_proveedor: data.tipoProveedor,
-    tipo_documento: data.tipoDocumento,
-    documento: data.documento,
-    razon_social_o_nombre: data.razonSocial,
-    contacto: data.contactoNombre,
-    telefono: data.telefono,
-    correo: data.correo,
-    departamento: data.departamento,
-    municipio: data.municipio,
-    direccion: data.direccion,
-    estado: data.estado === true,
+function buildPayload(data, estadoBool) {
+  return {
+    tipo_proveedor:        data.tipoProveedor        || "",
+    tipo_documento:        data.tipoDocumento        || "",
+    documento:             data.documento            || "",
+    razon_social_o_nombre: data.razonSocial          || "",
+    contacto:              data.contactoNombre       || "",
+    telefono:              data.telefono             || "",
+    correo:                data.correo               || "",
+    departamento:          data.departamento         || "",
+    municipio:             data.municipio            || "",
+    direccion:             data.direccion            || "",
+    estado:                estadoBool,
   };
-  const res = await api.post("/proveedores", payload);
+}
+
+export async function createProveedor(data) {
+  const estadoBool = data.estado === "activo" || data.estado === true;
+  const res = await api.post("/proveedores", buildPayload(data, estadoBool));
   return res.data;
 }
 
 export async function updateProveedor(id, data) {
-  const payload = {
-    tipo_proveedor: data.tipoProveedor,
-    tipo_documento: data.tipoDocumento,
-    documento: data.documento,
-    razon_social_o_nombre: data.razonSocial,
-    contacto: data.contactoNombre,
-    telefono: data.telefono,
-    correo: data.correo,
-    departamento: data.departamento,
-    municipio: data.municipio,
-    direccion: data.direccion,
-    estado: data.estado === true,
-  };
-  const res = await api.put(`/proveedores/${id}`, payload);
+  const estadoBool = data.estado === "activo" || data.estado === true;
+  const res = await api.put(`/proveedores/${id}`, buildPayload(data, estadoBool));
   return res.data;
 }
 
-// Cambiar estado usando el endpoint PUT que espera todos los campos
-export async function toggleEstadoProveedor(id, nuevoEstado) {
-  const proveedorActual = await getProveedorById(id);
-  if (!proveedorActual) throw new Error("Proveedor no encontrado");
-  
-  const payload = {
-    tipo_proveedor: proveedorActual.tipo_proveedor,
-    tipo_documento: proveedorActual.tipo_documento,
-    documento: proveedorActual.documento,
-    razon_social_o_nombre: proveedorActual.razon_social_o_nombre,
-    contacto: proveedorActual.contacto,
-    telefono: proveedorActual.telefono,
-    correo: proveedorActual.correo,
-    departamento: proveedorActual.departamento,
-    municipio: proveedorActual.municipio,
-    direccion: proveedorActual.direccion,
-    estado: nuevoEstado,
-  };
-  const res = await api.put(`/proveedores/${id}`, payload);
-  return res.data;
+export async function toggleEstadoProveedor(id, nuevoEstadoBool, rowData) {
+  const payload = buildPayload(rowData, nuevoEstadoBool);
+  console.warn("PAYLOAD TOGGLE:", JSON.stringify(payload));
+  try {
+    const res = await api.put(`/proveedores/${id}`, payload);
+    return res.data;
+  } catch (error) {
+    console.error("BACKEND ERROR RESPONSE:", JSON.stringify(error.response?.data));
+    throw error;
+  }
 }
 
 export async function deleteProveedor(id) {

@@ -27,41 +27,54 @@ export const calculateTotals = (productos) => {
 // Fila vacía para productos
 // ============================
 export const EMPTY_PRODUCT_ROW = {
-  productoId: "",
-  nombre: "",
-  stock: 0,
-  cantidad: 1,
+  productoId:  "",
+  nombre:      "",
+  stock:       0,
+  cantidad:    1,
   precioCompra: 0,
-  precioVenta: 0,
-  total: 0,
+  precioVenta:  0,
+  total:       0,
 };
 
 // ============================
-// Normalizar compra para formulario
-// estado_compra:
-//   false EXPLÍCITO → null  (Anulada — fila gris)
-//   true / null / undefined → "Completada"  (estado por defecto al crear)
+// Normalizador canónico de estado
+// Único punto de verdad — igual que ComprasNormalizer.js
+//   true / 1 / "completada" / "true" / "1"  → "Completada"
+//   false EXPLÍCITO del backend              → null  (fila gris / Anulada)
+//   null / undefined                         → "Completada" (creación nueva)
+// ============================
+export const normalizeEstadoCompra = (estado_compra) => {
+  if (estado_compra === false || estado_compra === 0 ||
+      estado_compra === "false" || estado_compra === "0" ||
+      (typeof estado_compra === "string" &&
+        estado_compra.toLowerCase() === "anulada")) {
+    return null; // anulada — el form la muestra en gris
+  }
+  return "Completada";
+};
+
+// ============================
+// Normalizar compra para formulario (DetalleCompra / CrearCompra)
 // ============================
 export const normalizeCompraForForm = (compra) => ({
-  id: compra.id,
-  proveedorId: compra.proveedor_id || compra.proveedorId || "",
+  id:              compra.id,
+  proveedorId:     compra.proveedor_id     || compra.proveedorId     || "",
   proveedorNombre: compra.proveedor_nombre || compra.proveedorNombre || "",
-  observaciones: compra.observaciones || "",
-  fecha: compra.fecha,
-  // Solo false EXPLÍCITO del backend = anulada; null / undefined / true = Completada
-  estado: compra.estado_compra === false ? null : "Completada",
-  numeroCompra: compra.numeroCompra || `C-${compra.id}`,
-  subtotal: compra.subtotal || 0,
-  iva: compra.iva || 0,
-  total: compra.total || 0,
+  observaciones:   compra.observaciones    ?? "",
+  fecha:           compra.fecha,
+  estado:          normalizeEstadoCompra(compra.estado_compra ?? compra.estado),
+  numeroCompra:    compra.numeroCompra || compra.numero_compra || `C-${compra.id}`,
+  subtotal:        Number(compra.subtotal ?? 0),
+  iva:             Number(compra.iva      ?? 0),
+  total:           Number(compra.total    ?? 0),
   productos: (compra.productos || compra.detalles || []).map((p) => ({
-    id: p.id,
-    productoId: p.producto_id || p.productoId,
-    nombre: p.producto_nombre || p.nombre,
-    stockActual: p.stock || p.stockActual || 0,
-    cantidad: p.cantidad,
-    precioCompra: p.precio_unidad || p.precio_unitario || p.precioCompra || 0,
-    precioVenta: p.precio_venta || p.precioVenta || 0,
-    total: p.subtotal || p.total || 0,
+    id:           p.id,
+    productoId:   p.producto_id   || p.productoId,
+    nombre:       p.producto_nombre || p.nombre || "",
+    stockActual:  Number(p.stock ?? p.stockActual ?? 0),
+    cantidad:     Number(p.cantidad ?? 1),
+    precioCompra: Number(p.precio_unidad  || p.precio_unitario || p.precioCompra  || 0),
+    precioVenta:  Number(p.precio_venta   || p.precioVenta  || 0),
+    total:        Number(p.subtotal       || p.total        || 0),
   })),
 });

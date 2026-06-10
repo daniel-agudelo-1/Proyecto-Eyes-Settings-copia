@@ -28,7 +28,7 @@ export default function CrearRol() {
   const createMutation = useMutation({
     mutationFn: createRol,
     onSuccess: (_, data) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['allRoles'] });
       sessionStorage.setItem(
         'crudNotification',
         JSON.stringify({ message: `Rol "${data.nombre}" creado correctamente`, type: 'success' })

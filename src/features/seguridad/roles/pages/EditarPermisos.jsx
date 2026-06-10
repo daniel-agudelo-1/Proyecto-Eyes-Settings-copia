@@ -45,7 +45,7 @@ export default function EditarPermisos() {
   const updateMutation = useMutation({
     mutationFn: (data) => updateRol(id, data),
     onSuccess: (_, data) => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['allRoles'] });
       queryClient.invalidateQueries({ queryKey: ['rol', id] });
       sessionStorage.setItem(
         'crudNotification',
